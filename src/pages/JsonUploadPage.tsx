@@ -6,23 +6,21 @@ import {
 } from "../shared/api/questionnaireApi";
 
 interface JsonUploadPageProps {
-  onQuestionnaireLoaded: (questionnaire: Questionnaire) => void;
+  onQuestionnairesLoaded: (questionnaires: Questionnaire[]) => void;
 }
 
-export function JsonUploadPage({ onQuestionnaireLoaded }: JsonUploadPageProps) {
+export function JsonUploadPage({ onQuestionnairesLoaded }: JsonUploadPageProps) {
   const [rawJson, setRawJson] = useState("");
   const [errors, setErrors] = useState<string[]>([]);
 
-  function loadFirstQuestionnaire(questionnaires: Questionnaire[]) {
-    const firstQuestionnaire = questionnaires[0];
-
-    if (!firstQuestionnaire) {
+  function loadQuestionnaires(questionnaires: Questionnaire[]) {
+    if (questionnaires.length === 0) {
       setErrors(["В JSON не найден ни один опросник."]);
       return;
     }
 
     setErrors([]);
-    onQuestionnaireLoaded(firstQuestionnaire);
+    onQuestionnairesLoaded(questionnaires);
   }
 
   function handleLoadFromText() {
@@ -35,7 +33,7 @@ export function JsonUploadPage({ onQuestionnaireLoaded }: JsonUploadPageProps) {
       return;
     }
 
-    loadFirstQuestionnaire(result.questionnaires);
+    loadQuestionnaires(result.questionnaires);
   }
 
   async function handleFileChange(file: File | null) {
@@ -52,7 +50,7 @@ export function JsonUploadPage({ onQuestionnaireLoaded }: JsonUploadPageProps) {
       return;
     }
 
-    loadFirstQuestionnaire(result.questionnaires);
+    loadQuestionnaires(result.questionnaires);
   }
 
   return (
@@ -61,8 +59,8 @@ export function JsonUploadPage({ onQuestionnaireLoaded }: JsonUploadPageProps) {
         <p className="page-kicker">Загрузка сценария</p>
         <h1>Загрузите JSON опросника из 1С</h1>
         <p>
-          Можно выбрать файл .json, который выгружен из конструктора опросников,
-          или вставить содержимое JSON вручную.
+          Можно выбрать один JSON-опросник, bundle-файл с несколькими
+          опросниками или вставить содержимое JSON вручную.
         </p>
 
         <label className="file-loader">
