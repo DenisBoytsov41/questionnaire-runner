@@ -4,6 +4,7 @@ import { JsonUploadPage } from "./pages/JsonUploadPage";
 import { QuestionnaireRunPage } from "./pages/QuestionnaireRunPage";
 import { QuestionnaireSelectPage } from "./pages/QuestionnaireSelectPage";
 import { loadQuestionnaireFromPublic } from "./shared/api/questionnaireApi";
+import { BrandHeader } from "./shared/ui/BrandHeader";
 import "./App.css";
 
 function App() {
@@ -74,6 +75,8 @@ function App() {
 
   return (
     <main className="app-shell">
+      <BrandHeader subtitle="Загрузка сценария из 1С" />
+
       {loadError && (
         <div className="notice-block">
           {loadError.split("\n").map((line) => (

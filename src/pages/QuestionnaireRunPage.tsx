@@ -1,5 +1,6 @@
 import type { Questionnaire } from "../entities/questionnaire/types";
 import { QuestionnaireRunner } from "../features/questionnaire-runner/ui/QuestionnaireRunner";
+import { BrandHeader } from "../shared/ui/BrandHeader";
 
 interface QuestionnaireRunPageProps {
   questionnaire: Questionnaire;
@@ -12,16 +13,13 @@ export function QuestionnaireRunPage({
 }: QuestionnaireRunPageProps) {
   return (
     <main className="app-shell">
-      <div className="top-bar">
-        <div>
-          <strong>Опросник первой линии</strong>
-          <span>Сценарий из 1С</span>
-        </div>
-
-        <button type="button" className="secondary-button" onClick={onResetQuestionnaire}>
-          Загрузить другой JSON
-        </button>
-      </div>
+      <BrandHeader
+        subtitle="Опросник первой линии"
+        action={{
+          label: "Загрузить другой JSON",
+          onClick: onResetQuestionnaire,
+        }}
+      />
 
       <QuestionnaireRunner questionnaire={questionnaire} />
     </main>

@@ -1,4 +1,5 @@
 import type { Questionnaire } from "../entities/questionnaire/types";
+import { BrandHeader } from "../shared/ui/BrandHeader";
 
 interface QuestionnaireSelectPageProps {
   questionnaires: Questionnaire[];
@@ -13,16 +14,13 @@ export function QuestionnaireSelectPage({
 }: QuestionnaireSelectPageProps) {
   return (
     <main className="app-shell">
-      <div className="top-bar">
-        <div>
-          <strong>Questionnaire Runner</strong>
-          <span>Выбор сценария из JSON</span>
-        </div>
-
-        <button type="button" className="secondary-button" onClick={onReset}>
-          Загрузить другой JSON
-        </button>
-      </div>
+      <BrandHeader
+        subtitle="Выбор сценария из JSON"
+        action={{
+          label: "Загрузить другой JSON",
+          onClick: onReset,
+        }}
+      />
 
       <section className="select-page">
         <div className="select-header">

@@ -1,8 +1,8 @@
 :root {
   --ks-ink: #061a18;
   --ks-muted: #5d716e;
-  --ks-brand: #00877f;
-  --ks-brand-dark: #00645e;
+  --ks-brand: #007f79;
+  --ks-brand-dark: #006963;
   --ks-brand-deep: #063f3b;
   --ks-brand-soft: #e4f5f2;
   --ks-brand-pale: #f2fbf9;
@@ -32,10 +32,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background:
-    radial-gradient(circle at 8% 0%, rgba(0, 135, 127, 0.16), transparent 34rem),
-    radial-gradient(circle at 95% 12%, rgba(6, 63, 59, 0.1), transparent 28rem),
-    linear-gradient(180deg, #f7fcfb 0%, #edf7f5 100%);
+  background: #f3f6f5;
 }
 
 button,
