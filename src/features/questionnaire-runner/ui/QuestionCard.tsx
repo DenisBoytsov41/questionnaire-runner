@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { isAnswerEmpty } from "../../../entities/questionnaire/helpers";
 import type {
   QuestionnaireQuestion,
@@ -41,17 +41,13 @@ export function QuestionCard({
 }: QuestionCardProps) {
   const [answer, setAnswer] = useState<QuestionAnswer>(() => getDefaultAnswer(question));
 
-  useEffect(() => {
-    setAnswer(getDefaultAnswer(question));
-  }, [question.id]);
-
-  function submitAnswer(nextAnswer: QuestionAnswer = answer) {
+  const submitAnswer = useCallback((nextAnswer: QuestionAnswer = answer) => {
     if (question.required && isAnswerEmpty(nextAnswer)) {
       return;
     }
 
     onAnswer(nextAnswer);
-  }
+  }, [answer, onAnswer, question]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -89,7 +85,7 @@ export function QuestionCard({
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [answer, canGoBack, onBack, question]);
+  }, [canGoBack, onBack, submitAnswer]);
 
   const isBooleanQuestion = question.answer_type === "boolean";
 

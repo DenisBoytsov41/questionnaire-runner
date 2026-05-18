@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { getActiveOptions } from "../../../entities/questionnaire/helpers";
 import type {
   QuestionnaireQuestion,
@@ -18,14 +17,7 @@ export function AnswerInput({
   onChange,
   onSubmit,
 }: AnswerInputProps) {
-  const [localValue, setLocalValue] = useState<QuestionAnswer>(value);
-
-  useEffect(() => {
-    setLocalValue(value);
-  }, [question.id, value]);
-
   function updateValue(nextValue: QuestionAnswer) {
-    setLocalValue(nextValue);
     onChange(nextValue);
   }
 
@@ -42,7 +34,7 @@ export function AnswerInput({
       <div className="boolean-answer-group">
         <button
           type="button"
-          className={`answer-choice-button ${localValue === true ? "selected" : ""}`}
+          className={`answer-choice-button ${value === true ? "selected" : ""}`}
           onClick={() => submitBooleanAnswer(true)}
         >
           Да
@@ -50,7 +42,7 @@ export function AnswerInput({
 
         <button
           type="button"
-          className={`answer-choice-button ${localValue === false ? "selected" : ""}`}
+          className={`answer-choice-button ${value === false ? "selected" : ""}`}
           onClick={() => submitBooleanAnswer(false)}
         >
           Нет
@@ -63,7 +55,7 @@ export function AnswerInput({
     return (
       <textarea
         className="answer-textarea"
-        value={typeof localValue === "string" ? localValue : ""}
+        value={typeof value === "string" ? value : ""}
         placeholder="Введите подробный ответ"
         onChange={(event) => updateValue(event.target.value)}
       />
@@ -75,7 +67,7 @@ export function AnswerInput({
       <input
         className="answer-input"
         type="number"
-        value={typeof localValue === "number" || typeof localValue === "string" ? localValue : ""}
+        value={typeof value === "number" || typeof value === "string" ? value : ""}
         placeholder="Введите число"
         onChange={(event) => updateValue(event.target.value)}
       />
@@ -87,7 +79,7 @@ export function AnswerInput({
       <input
         className="answer-input"
         type="date"
-        value={typeof localValue === "string" ? localValue : ""}
+        value={typeof value === "string" ? value : ""}
         onChange={(event) => updateValue(event.target.value)}
       />
     );
@@ -99,7 +91,7 @@ export function AnswerInput({
     return (
       <select
         className="answer-input"
-        value={typeof localValue === "string" ? localValue : ""}
+        value={typeof value === "string" ? value : ""}
         onChange={(event) => updateValue(event.target.value)}
       >
         <option value="">Выберите вариант</option>
@@ -115,7 +107,7 @@ export function AnswerInput({
 
   if (question.answer_type === "multiselect") {
     const options = getActiveOptions(question);
-    const selectedValues = Array.isArray(localValue) ? localValue : [];
+    const selectedValues = Array.isArray(value) ? value : [];
 
     return (
       <div className="checkbox-answer-group">
@@ -149,7 +141,7 @@ export function AnswerInput({
     <input
       className="answer-input"
       type="text"
-      value={typeof localValue === "string" ? localValue : ""}
+      value={typeof value === "string" ? value : ""}
       placeholder="Введите ответ"
       onChange={(event) => updateValue(event.target.value)}
     />
