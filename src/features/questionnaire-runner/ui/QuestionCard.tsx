@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { isAnswerEmpty } from "../../../entities/questionnaire/helpers";
+import { getActiveOptions, isAnswerEmpty } from "../../../entities/questionnaire/helpers";
 import type {
   QuestionnaireQuestion,
   QuestionAnswer,
@@ -10,6 +10,7 @@ interface QuestionCardProps {
   question: QuestionnaireQuestion;
   questionNumber: number;
   totalQuestions: number;
+  isBranchQuestion: boolean;
   validationError: string;
   canGoBack: boolean;
   onAnswer: (answer: QuestionAnswer) => void;
@@ -33,6 +34,7 @@ export function QuestionCard({
   question,
   questionNumber,
   totalQuestions,
+  isBranchQuestion,
   validationError,
   canGoBack,
   onAnswer,
@@ -65,6 +67,28 @@ export function QuestionCard({
       }
 
       if (event.key !== "Enter") {
+        if (event.altKey && question.answer_type === "boolean") {
+          if (event.key === "1") {
+            event.preventDefault();
+            submitAnswer(true);
+          }
+
+          if (event.key === "2") {
+            event.preventDefault();
+            submitAnswer(false);
+          }
+        }
+
+        if (event.altKey && question.answer_type === "select") {
+          const optionIndex = Number(event.key) - 1;
+          const option = getActiveOptions(question)[optionIndex];
+
+          if (option) {
+            event.preventDefault();
+            setAnswer(option.value);
+          }
+        }
+
         return;
       }
 
@@ -85,14 +109,17 @@ export function QuestionCard({
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [canGoBack, onBack, submitAnswer]);
+  }, [canGoBack, onBack, question, submitAnswer]);
 
   const isBooleanQuestion = question.answer_type === "boolean";
 
   return (
     <article className="question-card">
-      <div className="question-meta">
-        Вопрос {questionNumber} из {totalQuestions}
+      <div className="question-meta-row">
+        <span className="question-meta">
+          {isBranchQuestion ? "Уточняющий вопрос" : `Вопрос ${questionNumber} из ${totalQuestions}`}
+        </span>
+        {question.required && <span className="required-pill">Обязательный</span>}
       </div>
 
       <h2>{question.title}</h2>

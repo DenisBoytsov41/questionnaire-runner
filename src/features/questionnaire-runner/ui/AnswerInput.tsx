@@ -37,7 +37,8 @@ export function AnswerInput({
           className={`answer-choice-button ${value === true ? "selected" : ""}`}
           onClick={() => submitBooleanAnswer(true)}
         >
-          Да
+          <span>Да</span>
+          <small>Alt + 1</small>
         </button>
 
         <button
@@ -45,7 +46,8 @@ export function AnswerInput({
           className={`answer-choice-button ${value === false ? "selected" : ""}`}
           onClick={() => submitBooleanAnswer(false)}
         >
-          Нет
+          <span>Нет</span>
+          <small>Alt + 2</small>
         </button>
       </div>
     );
@@ -58,6 +60,7 @@ export function AnswerInput({
         value={typeof value === "string" ? value : ""}
         placeholder="Введите подробный ответ"
         onChange={(event) => updateValue(event.target.value)}
+        autoFocus
       />
     );
   }
@@ -70,6 +73,7 @@ export function AnswerInput({
         value={typeof value === "number" || typeof value === "string" ? value : ""}
         placeholder="Введите число"
         onChange={(event) => updateValue(event.target.value)}
+        autoFocus
       />
     );
   }
@@ -81,6 +85,7 @@ export function AnswerInput({
         type="date"
         value={typeof value === "string" ? value : ""}
         onChange={(event) => updateValue(event.target.value)}
+        autoFocus
       />
     );
   }
@@ -93,6 +98,7 @@ export function AnswerInput({
         className="answer-input"
         value={typeof value === "string" ? value : ""}
         onChange={(event) => updateValue(event.target.value)}
+        autoFocus
       >
         <option value="">Выберите вариант</option>
 
@@ -144,6 +150,7 @@ export function AnswerInput({
       value={typeof value === "string" ? value : ""}
       placeholder="Введите ответ"
       onChange={(event) => updateValue(event.target.value)}
+      autoFocus
     />
   );
 }

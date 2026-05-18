@@ -33,6 +33,7 @@ export function QuestionnaireRunner({ questionnaire }: QuestionnaireRunnerProps)
   const currentQuestionNumber = state.currentQuestion
     ? mainQuestions.findIndex((question) => question.id === state.currentQuestion?.id) + 1
     : mainQuestions.length;
+  const isBranchQuestion = currentQuestionNumber <= 0;
 
   if (state.isFinished || !state.currentQuestion) {
     return (
@@ -78,8 +79,9 @@ export function QuestionnaireRunner({ questionnaire }: QuestionnaireRunnerProps)
       <QuestionCard
         key={state.currentQuestion.id}
         question={state.currentQuestion}
-        questionNumber={currentQuestionNumber > 0 ? currentQuestionNumber : mainQuestions.length}
+        questionNumber={currentQuestionNumber}
         totalQuestions={mainQuestions.length}
+        isBranchQuestion={isBranchQuestion}
         validationError={state.validationError}
         canGoBack={state.history.length > 0}
         onAnswer={handleAnswer}
