@@ -50,7 +50,7 @@ export function SummaryPage({
     finishedAt,
   });
   const groupedQuestions = groupQuestionsBySection(questionnaire, answeredQuestions);
-  const applicationFields = getApplicationFields(answeredQuestions, answers);
+  const applicationFields = getApplicationFields(questionnaire, answeredQuestions, answers);
   const summaryText = buildSummaryText(questionnaire, groupedQuestions, answers, messages, verdicts);
 
   async function copySummary() {
@@ -304,22 +304,28 @@ function groupQuestionsBySection(
 }
 
 function getApplicationFields(
+  questionnaire: Questionnaire,
   questions: AnsweredQuestion[],
   answers: AnswersMap,
 ): ApplicationField[] {
-  const fieldMatchers: Array<[string, RegExp]> = [
-    ["Клиент", /фио клиента|имя клиента/i],
-    ["Телефон", /телефон/i],
-    ["Организация", /организац/i],
-    ["ККТ", /модель ккт/i],
-    ["Серийный номер", /серийный номер/i],
-    ["ФН", /фискальный номер|номер фн/i],
-    ["Суть обращения", /суть обращения/i],
+  const applicationQuestions = questions.filter((question) => {
+    const section = getSectionById(questionnaire, question.section_id);
+
+    return section?.title.trim().toLowerCase() === "данные для заявки";
+  });
+  const fieldMatchers: Array<[string, string]> = [
+    ["Клиент", "ФИО клиента"],
+    ["Телефон", "Телефон клиента"],
+    ["Организация", "Организация клиента"],
+    ["ККТ", "Модель ККТ"],
+    ["Серийный номер", "Серийный номер ККТ"],
+    ["ФН", "Фискальный номер / номер ФН"],
+    ["Суть обращения", "Суть обращения клиента"],
   ];
 
   return fieldMatchers
-    .map(([label, matcher]) => {
-      const question = questions.find((item) => matcher.test(item.title));
+    .map(([label, title]) => {
+      const question = applicationQuestions.find((item) => item.title === title);
 
       if (!question) {
         return null;

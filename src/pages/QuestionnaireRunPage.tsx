@@ -14,8 +14,8 @@ export function QuestionnaireRunPage({
     <main className="app-shell">
       <div className="top-bar">
         <div>
-          <strong>Questionnaire Runner</strong>
-          <span>JSON из 1С</span>
+          <strong>Опросник первой линии</strong>
+          <span>Сценарий из 1С</span>
         </div>
 
         <button type="button" className="secondary-button" onClick={onResetQuestionnaire}>

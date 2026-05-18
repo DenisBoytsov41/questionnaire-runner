@@ -4,7 +4,7 @@
 }
 
 .top-bar {
-  max-width: 1120px;
+  max-width: 960px;
   margin: 0 auto 24px;
   padding: 16px 20px;
   border: 1px solid #dbe2ea;
@@ -31,7 +31,7 @@
 .upload-page,
 .runner-page,
 .summary-page {
-  max-width: 920px;
+  max-width: 960px;
   margin: 0 auto;
 }
 
@@ -120,8 +120,8 @@ p {
 
 .question-card {
   display: grid;
-  gap: 18px;
-  min-height: 340px;
+  gap: 16px;
+  min-height: 300px;
 }
 
 .question-card h2 {
@@ -237,7 +237,7 @@ p {
 }
 
 .answer-input {
-  max-width: 520px;
+  max-width: 560px;
 }
 
 .json-textarea {

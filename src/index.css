@@ -42,6 +42,10 @@ select {
 }
 
 .answer-choice-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   min-width: 120px;
   border: 1px solid #cbd5e1;
   border-radius: 14px;
@@ -54,6 +58,20 @@ select {
     border-color 0.15s ease,
     background 0.15s ease,
     transform 0.15s ease;
+}
+
+.answer-choice-button span {
+  line-height: 1;
+}
+
+.answer-choice-button small {
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .answer-choice-button:hover {
