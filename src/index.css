@@ -31,3 +31,74 @@ textarea,
 select {
   font: inherit;
 }
+
+.question-card {
+  position: relative;
+}
+
+.boolean-answer-group {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.answer-choice-button {
+  min-width: 120px;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 14px 24px;
+  font-weight: 700;
+  color: #0f172a;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    transform 0.15s ease;
+}
+
+.answer-choice-button:hover {
+  border-color: #2563eb;
+  background: #eff6ff;
+  transform: translateY(-1px);
+}
+
+.answer-choice-button.selected {
+  border-color: #2563eb;
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.question-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+  padding: 16px 0 0;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0),
+    #ffffff 28%,
+    #ffffff 100%
+  );
+}
+
+.keyboard-hint {
+  margin-top: 10px;
+  text-align: right;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.validation-error {
+  margin-top: 14px;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  background: #fef2f2;
+  padding: 12px 14px;
+  color: #b91c1c;
+  font-weight: 600;
+}

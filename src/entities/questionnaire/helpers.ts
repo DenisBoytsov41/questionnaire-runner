@@ -16,12 +16,50 @@ export function sortByOrder<T extends { order: number }>(items: T[]): T[] {
   });
 }
 
+function getSectionOrderMap(questionnaire: Questionnaire): Map<string, number> {
+  const result = new Map<string, number>();
+
+  questionnaire.sections.forEach((section) => {
+    result.set(section.id, section.order);
+  });
+
+  return result;
+}
+
+function compareQuestionsBySectionAndOrder(
+  questionnaire: Questionnaire,
+  left: QuestionnaireQuestion,
+  right: QuestionnaireQuestion,
+): number {
+  const sectionOrderMap = getSectionOrderMap(questionnaire);
+
+  const leftSectionOrder = left.section_id
+    ? sectionOrderMap.get(left.section_id) ?? 0
+    : 0;
+
+  const rightSectionOrder = right.section_id
+    ? sectionOrderMap.get(right.section_id) ?? 0
+    : 0;
+
+  if (leftSectionOrder !== rightSectionOrder) {
+    return leftSectionOrder - rightSectionOrder;
+  }
+
+  if (left.order !== right.order) {
+    return left.order - right.order;
+  }
+
+  return left.id.localeCompare(right.id);
+}
+
 export function getActiveSections(questionnaire: Questionnaire): QuestionnaireSection[] {
   return sortByOrder(questionnaire.sections.filter((section) => section.active));
 }
 
 export function getActiveQuestions(questionnaire: Questionnaire): QuestionnaireQuestion[] {
-  return sortByOrder(questionnaire.questions.filter((question) => question.active));
+  return [...questionnaire.questions]
+    .filter((question) => question.active)
+    .sort((left, right) => compareQuestionsBySectionAndOrder(questionnaire, left, right));
 }
 
 export function getQuestionsBySection(
@@ -54,7 +92,7 @@ export function getQuestionById(
 export function getFirstActiveQuestion(
   questionnaire: Questionnaire,
 ): QuestionnaireQuestion | null {
-  const questions = getActiveQuestions(questionnaire);
+  const questions = getMainFlowQuestions(questionnaire);
 
   return questions.length > 0 ? questions[0] : null;
 }
@@ -63,18 +101,55 @@ export function getNextQuestionByOrder(
   questionnaire: Questionnaire,
   currentQuestion: QuestionnaireQuestion,
 ): QuestionnaireQuestion | null {
-  const activeQuestions = getActiveQuestions(questionnaire);
+  const activeQuestions = getMainFlowQuestions(questionnaire);
   const currentIndex = activeQuestions.findIndex(
     (question) => question.id === currentQuestion.id,
   );
 
   if (currentIndex < 0) {
-    return null;
+    return getNextQuestionAfterBranchQuestion(questionnaire, currentQuestion);
   }
 
   const nextQuestion = activeQuestions[currentIndex + 1];
 
   return nextQuestion ?? null;
+}
+
+function getNextQuestionAfterBranchQuestion(
+  questionnaire: Questionnaire,
+  currentQuestion: QuestionnaireQuestion,
+): QuestionnaireQuestion | null {
+  const mainQuestions = getMainFlowQuestions(questionnaire);
+
+  const nextQuestion = mainQuestions.find((question) => {
+    return compareQuestionsBySectionAndOrder(questionnaire, question, currentQuestion) > 0;
+  });
+
+  return nextQuestion ?? null;
+}
+
+export function getMainFlowQuestions(
+  questionnaire: Questionnaire,
+): QuestionnaireQuestion[] {
+  const branchTargetIds = getBranchTargetQuestionIds(questionnaire);
+
+  return getActiveQuestions(questionnaire).filter(
+    (question) => !branchTargetIds.has(question.id),
+  );
+}
+
+export function getBranchTargetQuestionIds(questionnaire: Questionnaire): Set<string> {
+  const result = new Set<string>();
+
+  questionnaire.questions.forEach((question) => {
+    (question.rules ?? []).forEach((rule) => {
+      if (rule.action === "go_to_question" && rule.question_id) {
+        result.add(rule.question_id);
+      }
+    });
+  });
+
+  return result;
 }
 
 export function getActiveOptions(question: QuestionnaireQuestion): QuestionnaireOption[] {

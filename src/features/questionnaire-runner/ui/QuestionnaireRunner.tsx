@@ -1,5 +1,8 @@
 import { useMemo, useReducer } from "react";
-import { getActiveQuestions, getSectionById } from "../../../entities/questionnaire/helpers";
+import {
+  getMainFlowQuestions,
+  getSectionById,
+} from "../../../entities/questionnaire/helpers";
 import type {
   Questionnaire,
   QuestionAnswer,
@@ -22,14 +25,14 @@ export function QuestionnaireRunner({ questionnaire }: QuestionnaireRunnerProps)
     createInitialRunnerState,
   );
 
-  const activeQuestions = useMemo(
-    () => getActiveQuestions(questionnaire),
+  const mainQuestions = useMemo(
+    () => getMainFlowQuestions(questionnaire),
     [questionnaire],
   );
 
   const currentQuestionNumber = state.currentQuestion
-    ? activeQuestions.findIndex((question) => question.id === state.currentQuestion?.id) + 1
-    : activeQuestions.length;
+    ? mainQuestions.findIndex((question) => question.id === state.currentQuestion?.id) + 1
+    : mainQuestions.length;
 
   if (state.isFinished || !state.currentQuestion) {
     return (
@@ -70,9 +73,10 @@ export function QuestionnaireRunner({ questionnaire }: QuestionnaireRunnerProps)
       )}
 
       <QuestionCard
+        key={state.currentQuestion.id}
         question={state.currentQuestion}
-        questionNumber={currentQuestionNumber}
-        totalQuestions={activeQuestions.length}
+        questionNumber={currentQuestionNumber > 0 ? currentQuestionNumber : mainQuestions.length}
+        totalQuestions={mainQuestions.length}
         validationError={state.validationError}
         canGoBack={state.history.length > 0}
         onAnswer={handleAnswer}

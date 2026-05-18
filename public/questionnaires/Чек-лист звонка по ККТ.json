@@ -1,0 +1,544 @@
+﻿{
+  "schema": "first_line_questionnaire",
+  "schema_version": 1,
+  "id": "000000001",
+  "title": "Чек-лист звонка по ККТ",
+  "description": "Чек-лист менеджера для ответа на звонок в сервисный центр по обслуживанию ККТ.",
+  "active": true,
+  "order": 1000,
+  "start_text": "Заполните чек-лист по итогам разговора с клиентом. Отметьте выполненные действия и соберите данные по ККТ.",
+  "finish_text": "Проверьте полноту данных, зарегистрируйте заявку и сообщите клиенту номер обращения.",
+  "sections": [
+    {
+      "id": "000000001",
+      "title": "Этап 1. Приветствие и идентификация",
+      "description": "Первичное приветствие клиента и идентификация звонка.",
+      "order": 1000,
+      "active": true,
+      "parent_id": null
+    },
+    {
+      "id": "000000002",
+      "title": "Этап 2. Сбор информации о клиенте и оборудовании",
+      "description": "Сбор данных о договоре, ККТ, регистрации и сути обращения.",
+      "order": 2000,
+      "active": true,
+      "parent_id": null
+    },
+    {
+      "id": "000000003",
+      "title": "Этап 3. Диагностика и классификация заявки",
+      "description": "Первичная диагностика, классификация обращения и проверка документов.",
+      "order": 3000,
+      "active": true,
+      "parent_id": null
+    },
+    {
+      "id": "000000004",
+      "title": "Этап 4. Предложение решения и согласование",
+      "description": "Выбор формата обслуживания, сроков, стоимости и согласование с клиентом.",
+      "order": 4000,
+      "active": true,
+      "parent_id": null
+    },
+    {
+      "id": "000000006",
+      "title": "Этап 5. Фиксация и завершение звонка",
+      "description": "Регистрация заявки, информирование клиента и завершение разговора.",
+      "order": 5000,
+      "active": true,
+      "parent_id": null
+    },
+    {
+      "id": "000000007",
+      "title": "Дополнительные пункты по ККТ",
+      "description": "Дополнительные вопросы по фискальному накопителю, ОФД, ПО, маркировке и обучению.",
+      "order": 6000,
+      "active": true,
+      "parent_id": null
+    },
+    {
+      "id": "000000008",
+      "title": "Данные для заявки",
+      "description": "Конкретные данные клиента и обращения, которые нужны для регистрации заявки.",
+      "order": 7000,
+      "active": true,
+      "parent_id": null
+    },
+    {
+      "id": "000000009",
+      "title": "Контроль качества звонка",
+      "description": "Итоговые контрольные вопросы по качеству обработки звонка.",
+      "order": 8000,
+      "active": true,
+      "parent_id": null
+    }
+  ],
+  "questions": [
+    {
+      "id": "000000002",
+      "section_id": "000000001",
+      "title": "Ответили ли вы в течение 5–20 секунд?",
+      "hint": "Зафиксируйте, был ли звонок принят быстро.",
+      "answer_type": "boolean",
+      "required": false,
+      "order": 1000,
+      "active": true,
+      "show_in_summary": true
+    },
+    {
+      "id": "000000003",
+      "section_id": "000000001",
+      "title": "Поздоровались ли вы вежливо и профессионально?",
+      "hint": "Проверка корректного приветствия клиента.",
+      "answer_type": "boolean",
+      "required": false,
+      "order": 2000,
+      "active": true,
+      "show_in_summary": false
+    },
+    {
+      "id": "000000004",
+      "section_id": "000000001",
+      "title": "Назвали ли вы сервисный центр?",
+      "hint": "Клиент должен понять, что попал по адресу.",
+      "answer_type": "boolean",
+      "required": false,
+      "order": 3000,
+      "active": true,
+      "show_in_summary": false
+    },
+    {
+      "id": "000000005",
+      "section_id": "000000001",
+      "title": "Представились ли вы по имени и должности?",
+      "hint": "Представление оператора повышает доверие клиента.",
+      "answer_type": "boolean",
+      "required": false,
+      "order": 4000,
+      "active": true,
+      "show_in_summary": false
+    },
+    {
+      "id": "000000006",
+      "section_id": "000000001",
+      "title": "Узнали ли вы имя клиента?",
+      "hint": "Имя нужно для персонализации общения.",
+      "answer_type": "boolean",
+      "required": false,
+      "order": 5000,
+      "active": true,
+      "show_in_summary": true
+    },
+    {
+      "id": "000000007",
+      "section_id": "000000002",
+      "title": "Запросили ли вы номер договора на техподдержку ККТ?",
+      "hint": "Номер договора нужен для проверки условий обслуживания.",
+      "answer_type": "boolean",
+      "required": false,
+      "order": 1000,
+      "active": true,
+      "show_in_summary": true
+    },
+    {
+      "id": "000000008",
+      "section_id": "000000002",
+      "title": "Уточнили ли вы модель, серийный номер и фискальный номер кассы?",
+      "hint": "Соберите данные ККТ для идентификации оборудования.",
+      "answer_type": "boolean",
+      "required": false,
+      "order": 2000,
+      "active": true,
+      "show_in_summary": true
+    },
+    {
+      "id": "000000009",
+      "section_id": "000000002",
+      "title": "Проверили ли вы регистрацию ККТ в ФНС и подключение к ОФД?",
+      "hint": "Уточните, зарегистрирована ли ККТ и подключена ли к оператору фискальных данных.",
+      "answer_type": "boolean",
+      "required": false,
+      "order": 3000,
+      "active": true,
+      "show_in_summary": true
+    },
+    {
+      "id": "000000010",
+      "section_id": "000000002",
+      "title": "Выяснили ли вы характер проблемы?",
+      "hint": "Поломка, настройка, консультация, замена ФН или другой тип обращения.",
+      "answer_type": "boolean",
+      "required": false,
+      "order": 4000,
+      "active": true,
+      "show_in_summary": true
+    },
+    {
+      "id": "000000011",
+      "section_id": "000000002",
+      "title": "Определили ли вы срочность проблемы?",
+      "hint": "Остановка торговли, критичная проблема или плановое обслуживание.",
+      "answer_type": "boolean",
+      "required": false,
+      "order": 5000,
+      "active": true,
+      "show_in_summary": true
+    },
+    {
+      "id": "000000012",
+      "section_id": "000000003",
+      "title": "Классифицировали ли вы тип обращения?",
+      "hint": "Экстренный ремонт, плановое ТО, консультация или обучение.",
+      "answer_type": "boolean",
+      "required": false,
+      "order": 1000,
+      "active": true,
+      "show_in_summary": true
+    },
+    {
+      "id": "000000013",
+      "section_id": "000000003",
+      "title": "Задали ли вы уточняющие вопросы для первичной диагностики?",
+      "hint": "Ошибки на дисплее, связь с ОФД, печать чеков.",
+      "answer_type": "boolean",
+      "required": false,
+      "order": 2000,
+      "active": true,
+      "show_in_summary": true
+    },
+    {
+      "id": "000000014",
+      "section_id": "000000003",
+      "title": "Проверили ли наличие документов по ККТ?",
+      "hint": "Паспорт ККТ, акт ввода в эксплуатацию, договор с ОФД.",
+      "answer_type": "boolean",
+      "required": false,
+      "order": 3000,
+      "active": true,
+      "show_in_summary": true
+    },
+    {
+      "id": "000000015",
+      "section_id": "000000003",
+      "title": "Уточнили ли гарантийный статус оборудования?",
+      "hint": "Уточните гарантию и условия обслуживания.",
+      "answer_type": "boolean",
+      "required": false,
+      "order": 4000,
+      "active": true,
+      "show_in_summary": true
+    },
+    {
+      "id": "000000016",
+      "section_id": "000000004",
+      "title": "Предложили ли клиенту вариант решения?",
+      "hint": "Выезд инженера, доставка в сервисный центр или удалённая помощь.",
+      "answer_type": "boolean",
+      "required": false,
+      "order": 1000,
+      "active": true,
+      "show_in_summary": true
+    },
+    {
+      "id": "000000017",
+      "section_id": "000000004",
+      "title": "Озвучили ли ориентировочные сроки и стоимость?",
+      "hint": "В рамках тарифа или разовое обслуживание.",
+      "answer_type": "boolean",
+      "required": false,
+      "order": 2000,
+      "active": true,
+      "show_in_summary": true
+    },
+    {
+      "id": "000000018",
+      "section_id": "000000004",
+      "title": "Сообщили ли необходимые документы и данные для заявки?",
+      "hint": "Объясните клиенту, что потребуется для оформления.",
+      "answer_type": "boolean",
+      "required": false,
+      "order": 3000,
+      "active": true,
+      "show_in_summary": true
+    },
+    {
+      "id": "000000019",
+      "section_id": "000000004",
+      "title": "Получили ли согласие клиента на выбранный формат обслуживания?",
+      "hint": "Зафиксируйте подтверждение клиента.",
+      "answer_type": "boolean",
+      "required": false,
+      "order": 4000,
+      "active": true,
+      "show_in_summary": true
+    },
+    {
+      "id": "000000020",
+      "section_id": "000000006",
+      "title": "Внесли ли данные в систему учёта?",
+      "hint": "Контакты, модель ККТ, суть проблемы, приоритет.",
+      "answer_type": "boolean",
+      "required": false,
+      "order": 1000,
+      "active": true,
+      "show_in_summary": true,
+      "rules": [
+        {
+          "value": "true",
+          "action": "next",
+          "question_id": null,
+          "message": "",
+          "verdict": ""
+        },
+        {
+          "value": "false",
+          "action": "go_to_question",
+          "question_id": "000000041",
+          "message": "Уточните причину, почему данные не были внесены.",
+          "verdict": "Требуется дополнительное действие оператора."
+        }
+      ]
+    },
+    {
+      "id": "000000021",
+      "section_id": "000000006",
+      "title": "Сообщили ли клиенту номер заявки?",
+      "hint": "Назовите номер заявки и контакты для отслеживания статуса.",
+      "answer_type": "boolean",
+      "required": false,
+      "order": 2000,
+      "active": true,
+      "show_in_summary": true
+    },
+    {
+      "id": "000000022",
+      "section_id": "000000006",
+      "title": "Дали ли рекомендации до приезда специалиста?",
+      "hint": "Например, не отключать питание, сохранить ошибку на экране, не выполнять лишние действия.",
+      "answer_type": "boolean",
+      "required": false,
+      "order": 3000,
+      "active": true,
+      "show_in_summary": true
+    },
+    {
+      "id": "000000023",
+      "section_id": "000000006",
+      "title": "Поблагодарили ли клиента и корректно завершили разговор?",
+      "hint": "Уточните, остались ли вопросы, и завершите звонок вежливо.",
+      "answer_type": "boolean",
+      "required": false,
+      "order": 4000,
+      "active": true,
+      "show_in_summary": false
+    },
+    {
+      "id": "000000024",
+      "section_id": "000000006",
+      "title": "Проявили ли эмпатию и говорили ли чётко?",
+      "hint": "Без слов-паразитов, с хорошей дикцией, спокойным тоном.",
+      "answer_type": "boolean",
+      "required": false,
+      "order": 5000,
+      "active": true,
+      "show_in_summary": true
+    },
+    {
+      "id": "000000041",
+      "section_id": "000000006",
+      "title": "Почему данные не внесены в систему учёта?",
+      "hint": "",
+      "answer_type": "text",
+      "required": true,
+      "order": 6000,
+      "active": true,
+      "show_in_summary": true
+    },
+    {
+      "id": "000000025",
+      "section_id": "000000007",
+      "title": "Уточнили ли срок действия фискального накопителя?",
+      "hint": "Проверьте срок ФН и необходимость замены.",
+      "answer_type": "boolean",
+      "required": false,
+      "order": 1000,
+      "active": true,
+      "show_in_summary": true
+    },
+    {
+      "id": "000000026",
+      "section_id": "000000007",
+      "title": "Проверили ли передачу чеков в ФНС через ОФД?",
+      "hint": "Уточните, передаются ли чеки оператору фискальных данных.",
+      "answer_type": "boolean",
+      "required": false,
+      "order": 2000,
+      "active": true,
+      "show_in_summary": true
+    },
+    {
+      "id": "000000027",
+      "section_id": "000000007",
+      "title": "Предложили ли проверку актуальности прошивки?",
+      "hint": "Проверка актуальности ПО под требования 54-ФЗ.",
+      "answer_type": "boolean",
+      "required": false,
+      "order": 3000,
+      "active": true,
+      "show_in_summary": true
+    },
+    {
+      "id": "000000028",
+      "section_id": "000000007",
+      "title": "Уточнили ли необходимость настройки маркировки Честный ЗНАК?",
+      "hint": "Актуально для клиентов, работающих с маркированными товарами.",
+      "answer_type": "boolean",
+      "required": false,
+      "order": 4000,
+      "active": true,
+      "show_in_summary": true
+    },
+    {
+      "id": "000000029",
+      "section_id": "000000007",
+      "title": "Предложили ли обучение персонала работе с ККТ?",
+      "hint": "Консультация или обучение сотрудников клиента.",
+      "answer_type": "boolean",
+      "required": false,
+      "order": 5000,
+      "active": true,
+      "show_in_summary": true
+    },
+    {
+      "id": "000000031",
+      "section_id": "000000008",
+      "title": "ФИО клиента",
+      "hint": "",
+      "answer_type": "string",
+      "required": true,
+      "order": 1000,
+      "active": true,
+      "show_in_summary": true
+    },
+    {
+      "id": "000000032",
+      "section_id": "000000008",
+      "title": "Телефон клиента",
+      "hint": "",
+      "answer_type": "string",
+      "required": true,
+      "order": 2000,
+      "active": true,
+      "show_in_summary": true
+    },
+    {
+      "id": "000000033",
+      "section_id": "000000008",
+      "title": "Организация клиента",
+      "hint": "",
+      "answer_type": "string",
+      "required": true,
+      "order": 3000,
+      "active": true,
+      "show_in_summary": true
+    },
+    {
+      "id": "000000034",
+      "section_id": "000000008",
+      "title": "Модель ККТ",
+      "hint": "",
+      "answer_type": "string",
+      "required": false,
+      "order": 4000,
+      "active": true,
+      "show_in_summary": true
+    },
+    {
+      "id": "000000035",
+      "section_id": "000000008",
+      "title": "Серийный номер ККТ",
+      "hint": "",
+      "answer_type": "string",
+      "required": false,
+      "order": 5000,
+      "active": true,
+      "show_in_summary": true
+    },
+    {
+      "id": "000000036",
+      "section_id": "000000008",
+      "title": "Фискальный номер / номер ФН",
+      "hint": "",
+      "answer_type": "string",
+      "required": false,
+      "order": 6000,
+      "active": true,
+      "show_in_summary": true
+    },
+    {
+      "id": "000000037",
+      "section_id": "000000008",
+      "title": "Суть обращения клиента",
+      "hint": "",
+      "answer_type": "text",
+      "required": true,
+      "order": 7000,
+      "active": true,
+      "show_in_summary": true
+    },
+    {
+      "id": "000000038",
+      "section_id": "000000009",
+      "title": "Уточнили ли вы у клиента, остались ли дополнительные вопросы?",
+      "hint": "Перед завершением звонка нужно убедиться, что клиенту больше ничего не требуется.",
+      "answer_type": "boolean",
+      "required": false,
+      "order": 1000,
+      "active": true,
+      "show_in_summary": true
+    },
+    {
+      "id": "000000039",
+      "section_id": "000000009",
+      "title": "Предложили ли вы клиенту дополнительную консультацию или обучение?",
+      "hint": "Если клиент плохо ориентируется в работе с ККТ, можно предложить консультацию или обучение.",
+      "answer_type": "boolean",
+      "required": false,
+      "order": 1500,
+      "active": true,
+      "show_in_summary": true
+    },
+    {
+      "id": "000000040",
+      "section_id": "000000009",
+      "title": "Как клиент оценил качество консультации?",
+      "hint": "Если клиент явно выразил оценку, выберите подходящий вариант.",
+      "answer_type": "select",
+      "required": false,
+      "order": 2000,
+      "active": true,
+      "show_in_summary": true,
+      "options": [
+        {
+          "value": "1000",
+          "title": "Положительно",
+          "order": 1000,
+          "active": true
+        },
+        {
+          "value": "2000",
+          "title": "Нейтрально",
+          "order": 2000,
+          "active": true
+        },
+        {
+          "value": "3000",
+          "title": "Негативно",
+          "order": 3000,
+          "active": true
+        }
+      ]
+    }
+  ]
+}

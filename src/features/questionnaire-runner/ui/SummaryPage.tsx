@@ -24,7 +24,7 @@ export function SummaryPage({
   onRestart,
 }: SummaryPageProps) {
   const answeredQuestions = getActiveQuestions(questionnaire).filter(
-    (question) => question.show_in_summary && question.id in answers,
+    (question) => question.show_in_summary && Object.prototype.hasOwnProperty.call(answers, question.id),
   );
 
   return (

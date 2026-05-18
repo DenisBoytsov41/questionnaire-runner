@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { getActiveOptions } from "../../../entities/questionnaire/helpers";
 import type {
   QuestionnaireQuestion,
@@ -7,27 +8,50 @@ import type {
 interface AnswerInputProps {
   question: QuestionnaireQuestion;
   value: QuestionAnswer;
-  onChange: (value: QuestionAnswer) => void;
+  onChange: (answer: QuestionAnswer) => void;
+  onSubmit?: (answer: QuestionAnswer) => void;
 }
 
-export function AnswerInput({ question, value, onChange }: AnswerInputProps) {
-  const options = getActiveOptions(question);
+export function AnswerInput({
+  question,
+  value,
+  onChange,
+  onSubmit,
+}: AnswerInputProps) {
+  const [localValue, setLocalValue] = useState<QuestionAnswer>(value);
+
+  useEffect(() => {
+    setLocalValue(value);
+  }, [question.id, value]);
+
+  function updateValue(nextValue: QuestionAnswer) {
+    setLocalValue(nextValue);
+    onChange(nextValue);
+  }
+
+  function submitBooleanAnswer(nextValue: boolean) {
+    updateValue(nextValue);
+
+    if (onSubmit) {
+      onSubmit(nextValue);
+    }
+  }
 
   if (question.answer_type === "boolean") {
     return (
-      <div className="answer-buttons">
+      <div className="boolean-answer-group">
         <button
           type="button"
-          className={value === true ? "answer-button active" : "answer-button"}
-          onClick={() => onChange(true)}
+          className={`answer-choice-button ${localValue === true ? "selected" : ""}`}
+          onClick={() => submitBooleanAnswer(true)}
         >
           Да
         </button>
 
         <button
           type="button"
-          className={value === false ? "answer-button active" : "answer-button"}
-          onClick={() => onChange(false)}
+          className={`answer-choice-button ${localValue === false ? "selected" : ""}`}
+          onClick={() => submitBooleanAnswer(false)}
         >
           Нет
         </button>
@@ -35,12 +59,48 @@ export function AnswerInput({ question, value, onChange }: AnswerInputProps) {
     );
   }
 
+  if (question.answer_type === "text") {
+    return (
+      <textarea
+        className="answer-textarea"
+        value={typeof localValue === "string" ? localValue : ""}
+        placeholder="Введите подробный ответ"
+        onChange={(event) => updateValue(event.target.value)}
+      />
+    );
+  }
+
+  if (question.answer_type === "number") {
+    return (
+      <input
+        className="answer-input"
+        type="number"
+        value={typeof localValue === "number" || typeof localValue === "string" ? localValue : ""}
+        placeholder="Введите число"
+        onChange={(event) => updateValue(event.target.value)}
+      />
+    );
+  }
+
+  if (question.answer_type === "date") {
+    return (
+      <input
+        className="answer-input"
+        type="date"
+        value={typeof localValue === "string" ? localValue : ""}
+        onChange={(event) => updateValue(event.target.value)}
+      />
+    );
+  }
+
   if (question.answer_type === "select") {
+    const options = getActiveOptions(question);
+
     return (
       <select
-        className="field"
-        value={typeof value === "string" ? value : ""}
-        onChange={(event) => onChange(event.target.value)}
+        className="answer-input"
+        value={typeof localValue === "string" ? localValue : ""}
+        onChange={(event) => updateValue(event.target.value)}
       >
         <option value="">Выберите вариант</option>
 
@@ -54,24 +114,25 @@ export function AnswerInput({ question, value, onChange }: AnswerInputProps) {
   }
 
   if (question.answer_type === "multiselect") {
-    const selectedValues = Array.isArray(value) ? value : [];
+    const options = getActiveOptions(question);
+    const selectedValues = Array.isArray(localValue) ? localValue : [];
 
     return (
-      <div className="checkbox-list">
+      <div className="checkbox-answer-group">
         {options.map((option) => {
           const checked = selectedValues.includes(option.value);
 
           return (
-            <label key={option.value} className="checkbox-row">
+            <label key={option.value} className="checkbox-answer-item">
               <input
                 type="checkbox"
                 checked={checked}
                 onChange={(event) => {
                   if (event.target.checked) {
-                    onChange([...selectedValues, option.value]);
+                    updateValue([...selectedValues, option.value]);
                   } else {
-                    onChange(
-                      selectedValues.filter((item) => item !== option.value),
+                    updateValue(
+                      selectedValues.filter((valueItem) => valueItem !== option.value),
                     );
                   }
                 }}
@@ -84,50 +145,13 @@ export function AnswerInput({ question, value, onChange }: AnswerInputProps) {
     );
   }
 
-  if (question.answer_type === "text") {
-    return (
-      <textarea
-        className="field textarea"
-        value={typeof value === "string" ? value : ""}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder="Введите подробный ответ"
-      />
-    );
-  }
-
-  if (question.answer_type === "number") {
-    return (
-      <input
-        className="field"
-        type="number"
-        value={typeof value === "number" || typeof value === "string" ? value : ""}
-        onChange={(event) => {
-          const rawValue = event.target.value;
-          onChange(rawValue === "" ? null : Number(rawValue));
-        }}
-        placeholder="Введите число"
-      />
-    );
-  }
-
-  if (question.answer_type === "date") {
-    return (
-      <input
-        className="field"
-        type="date"
-        value={typeof value === "string" ? value : ""}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    );
-  }
-
   return (
     <input
-      className="field"
+      className="answer-input"
       type="text"
-      value={typeof value === "string" ? value : ""}
-      onChange={(event) => onChange(event.target.value)}
+      value={typeof localValue === "string" ? localValue : ""}
       placeholder="Введите ответ"
+      onChange={(event) => updateValue(event.target.value)}
     />
   );
 }
