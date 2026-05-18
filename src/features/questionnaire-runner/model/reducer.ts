@@ -36,6 +36,12 @@ export type RunnerAction =
       type: "BACK";
     }
   | {
+      type: "NAVIGATE_TO_ROUTE";
+      payload: {
+        questionId: string;
+      };
+    }
+  | {
       type: "RESET";
     }
   | {
@@ -91,6 +97,45 @@ export function runnerReducer(state: RunnerState, action: RunnerAction): RunnerS
       ...state,
       currentQuestion: previousQuestion,
       history: state.history.slice(0, -1),
+      isFinished: false,
+      validationError: "",
+      finishedAt: null,
+    };
+  }
+
+  if (action.type === "NAVIGATE_TO_ROUTE") {
+    const targetIndex = state.history.indexOf(action.payload.questionId);
+
+    if (targetIndex < 0) {
+      return state;
+    }
+
+    const currentQuestion = state.questionnaire.questions.find(
+      (question) => question.id === action.payload.questionId,
+    );
+
+    if (!currentQuestion) {
+      return state;
+    }
+
+    const retainedQuestionIds = state.history.slice(0, targetIndex + 1);
+    const completedBeforeTargetIds = state.history.slice(0, targetIndex);
+    const completedBeforeTargetIdSet = new Set(completedBeforeTargetIds);
+    const answers = retainedQuestionIds.reduce<AnswersMap>((result, questionId) => {
+      if (Object.prototype.hasOwnProperty.call(state.answers, questionId)) {
+        result[questionId] = state.answers[questionId];
+      }
+
+      return result;
+    }, {});
+
+    return {
+      ...state,
+      currentQuestion,
+      answers,
+      history: state.history.slice(0, targetIndex),
+      messages: state.messages.filter((item) => completedBeforeTargetIdSet.has(item.questionId)),
+      verdicts: state.verdicts.filter((item) => completedBeforeTargetIdSet.has(item.questionId)),
       isFinished: false,
       validationError: "",
       finishedAt: null,

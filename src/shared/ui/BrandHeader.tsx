@@ -10,7 +10,9 @@ export function BrandHeader({ subtitle, action }: BrandHeaderProps) {
   return (
     <div className="top-bar">
       <div className="brand-lockup">
-        <img src="/ks-logo.png" alt="К-Сервис" className="brand-logo" />
+        <span className="brand-logo-mark">
+          <img src="/ks-logo-full.png" alt="К-Сервис" className="brand-logo" />
+        </span>
 
         <div>
           <strong>К-Сервис</strong>

@@ -12,6 +12,7 @@ interface QuestionCardProps {
   totalQuestions: number;
   isBranchQuestion: boolean;
   validationError: string;
+  initialAnswer: QuestionAnswer | undefined;
   canGoBack: boolean;
   onAnswer: (answer: QuestionAnswer) => void;
   onBack: () => void;
@@ -36,12 +37,15 @@ export function QuestionCard({
   totalQuestions,
   isBranchQuestion,
   validationError,
+  initialAnswer,
   canGoBack,
   onAnswer,
   onBack,
   onFinish,
 }: QuestionCardProps) {
-  const [answer, setAnswer] = useState<QuestionAnswer>(() => getDefaultAnswer(question));
+  const [answer, setAnswer] = useState<QuestionAnswer>(
+    () => initialAnswer ?? getDefaultAnswer(question),
+  );
 
   const submitAnswer = useCallback((nextAnswer: QuestionAnswer = answer) => {
     if (question.required && isAnswerEmpty(nextAnswer)) {
