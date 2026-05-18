@@ -1,6 +1,9 @@
 import { useState } from "react";
 import type { Questionnaire } from "../entities/questionnaire/types";
-import { parseQuestionnaireJson } from "../shared/api/questionnaireApi";
+import {
+  parseQuestionnaireJsonText,
+  readJsonFile,
+} from "../shared/api/questionnaireApi";
 
 interface JsonUploadPageProps {
   onQuestionnaireLoaded: (questionnaire: Questionnaire) => void;
@@ -8,54 +11,48 @@ interface JsonUploadPageProps {
 
 export function JsonUploadPage({ onQuestionnaireLoaded }: JsonUploadPageProps) {
   const [rawJson, setRawJson] = useState("");
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState<string[]>([]);
 
-  function handleLoadFromText() {
-    setError("");
+  function loadFirstQuestionnaire(questionnaires: Questionnaire[]) {
+    const firstQuestionnaire = questionnaires[0];
 
-    try {
-      const questionnaire = parseQuestionnaireJson(rawJson);
-      onQuestionnaireLoaded(questionnaire);
-    } catch (caughtError) {
-      const message =
-        caughtError instanceof Error
-          ? caughtError.message
-          : "Не удалось прочитать JSON.";
-
-      setError(message);
+    if (!firstQuestionnaire) {
+      setErrors(["В JSON не найден ни один опросник."]);
+      return;
     }
+
+    setErrors([]);
+    onQuestionnaireLoaded(firstQuestionnaire);
   }
 
-  function handleFileChange(file: File | null) {
-    setError("");
+  function handleLoadFromText() {
+    setErrors([]);
+
+    const result = parseQuestionnaireJsonText(rawJson);
+
+    if (!result.ok) {
+      setErrors(result.errors);
+      return;
+    }
+
+    loadFirstQuestionnaire(result.questionnaires);
+  }
+
+  async function handleFileChange(file: File | null) {
+    setErrors([]);
 
     if (!file) {
       return;
     }
 
-    const reader = new FileReader();
+    const result = await readJsonFile(file);
 
-    reader.onload = () => {
-      const text = String(reader.result ?? "");
+    if (!result.ok) {
+      setErrors(result.errors);
+      return;
+    }
 
-      try {
-        const questionnaire = parseQuestionnaireJson(text);
-        onQuestionnaireLoaded(questionnaire);
-      } catch (caughtError) {
-        const message =
-          caughtError instanceof Error
-            ? caughtError.message
-            : "Не удалось прочитать JSON.";
-
-        setError(message);
-      }
-    };
-
-    reader.onerror = () => {
-      setError("Не удалось прочитать файл.");
-    };
-
-    reader.readAsText(file, "UTF-8");
+    loadFirstQuestionnaire(result.questionnaires);
   }
 
   return (
@@ -84,7 +81,17 @@ export function JsonUploadPage({ onQuestionnaireLoaded }: JsonUploadPageProps) {
           placeholder="Вставьте JSON опросника сюда"
         />
 
-        {error && <div className="validation-error">{error}</div>}
+        {errors.length > 0 && (
+          <div className="validation-error">
+            <strong>JSON не прошёл проверку:</strong>
+
+            <ul>
+              {errors.map((error) => (
+                <li key={error}>{error}</li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <button type="button" className="primary-button" onClick={handleLoadFromText}>
           Загрузить из текста
