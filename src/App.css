@@ -881,49 +881,50 @@ p {
 }
 
 .runner-page {
-  max-width: 1120px;
-}
-
-.runner-header {
   max-width: 760px;
 }
 
-.runner-workspace {
+.runner-navigator {
   display: grid;
-  grid-template-columns: minmax(0, 760px) 320px;
-  gap: 18px;
-  align-items: start;
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
-.runner-main-column {
-  min-width: 0;
-}
-
-.runner-sidebar {
-  position: sticky;
-  top: 18px;
-  display: grid;
-  gap: 14px;
-}
-
-.runner-sidebar-card {
+.navigator-panel {
   border: 1px solid #d7e4e2;
   border-radius: 14px;
   background: #ffffff;
-  padding: 16px;
+  padding: 0;
   box-shadow: 0 3px 10px rgba(6, 63, 59, 0.04);
 }
 
-.runner-sidebar-header {
+.navigator-panel summary {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
+  padding: 14px 18px;
+  cursor: pointer;
+  list-style: none;
 }
 
-.runner-sidebar-header span,
-.map-card summary {
+.navigator-panel summary::-webkit-details-marker {
+  display: none;
+}
+
+.navigator-panel summary::before {
+  content: "▸";
+  color: var(--ks-brand);
+  font-size: 13px;
+  transition: transform 0.15s ease;
+}
+
+.navigator-panel[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.navigator-panel summary span,
+.navigator-panel summary {
   color: var(--ks-brand-dark);
   font-size: 13px;
   font-weight: 800;
@@ -931,7 +932,19 @@ p {
   text-transform: uppercase;
 }
 
-.runner-sidebar-header strong {
+.runner-sidebar-header {
+  padding: 0 18px 10px;
+}
+
+.runner-sidebar-header span {
+  color: var(--ks-brand-dark);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.navigator-panel summary strong {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -943,18 +956,19 @@ p {
 }
 
 .route-list {
-  display: grid;
-  gap: 8px;
-  max-height: 320px;
+  display: flex;
+  gap: 10px;
+  max-height: none;
   overflow: auto;
-  padding-right: 4px;
+  padding: 0 18px 18px;
 }
 
 .route-step {
   display: grid;
   grid-template-columns: 28px 1fr;
   gap: 8px 10px;
-  width: 100%;
+  min-width: 220px;
+  max-width: 280px;
   border: 1px solid #dce8e6;
   border-radius: 12px;
   background: #ffffff;
@@ -1002,17 +1016,13 @@ button.route-step {
   background: #f4fbfa;
 }
 
-.map-card summary {
-  cursor: pointer;
-}
-
 .question-map {
   display: grid;
   gap: 14px;
-  margin-top: 14px;
+  margin-top: 0;
   max-height: 520px;
   overflow: auto;
-  padding-right: 4px;
+  padding: 0 18px 18px;
 }
 
 .question-map-section h3 {
@@ -1075,18 +1085,4 @@ button.route-step {
   padding: 5px 7px;
   color: var(--ks-muted);
   font-size: 11px;
-}
-
-@media (max-width: 1120px) {
-  .runner-workspace {
-    grid-template-columns: 1fr;
-  }
-
-  .runner-sidebar {
-    position: static;
-  }
-
-  .runner-header {
-    max-width: none;
-  }
 }

@@ -70,45 +70,41 @@ export function QuestionnaireRunner({ questionnaire }: QuestionnaireRunnerProps)
         <p>{questionnaire.start_text}</p>
       </div>
 
-      <div className="runner-workspace">
-        <div className="runner-main-column">
-          {section && (
-            <div className="section-banner">
-              <strong>{section.title}</strong>
-              {section.description && <span>{section.description}</span>}
-            </div>
-          )}
+      <QuestionnaireMap
+        questionnaire={questionnaire}
+        currentQuestionId={state.currentQuestion.id}
+        completedRoute={state.history}
+        answers={state.answers}
+        onNavigateToQuestion={(questionId) => {
+          dispatch({
+            type: "NAVIGATE_TO_ROUTE",
+            payload: {
+              questionId,
+            },
+          });
+        }}
+      />
 
-          <QuestionCard
-            key={state.currentQuestion.id}
-            question={state.currentQuestion}
-            questionNumber={currentQuestionNumber}
-            totalQuestions={mainQuestions.length}
-            isBranchQuestion={isBranchQuestion}
-            initialAnswer={state.answers[state.currentQuestion.id]}
-            validationError={state.validationError}
-            canGoBack={state.history.length > 0}
-            onAnswer={handleAnswer}
-            onBack={() => dispatch({ type: "BACK" })}
-            onFinish={() => dispatch({ type: "FINISH" })}
-          />
+      {section && (
+        <div className="section-banner">
+          <strong>{section.title}</strong>
+          {section.description && <span>{section.description}</span>}
         </div>
+      )}
 
-        <QuestionnaireMap
-          questionnaire={questionnaire}
-          currentQuestionId={state.currentQuestion.id}
-          completedRoute={state.history}
-          answers={state.answers}
-          onNavigateToQuestion={(questionId) => {
-            dispatch({
-              type: "NAVIGATE_TO_ROUTE",
-              payload: {
-                questionId,
-              },
-            });
-          }}
-        />
-      </div>
+      <QuestionCard
+        key={state.currentQuestion.id}
+        question={state.currentQuestion}
+        questionNumber={currentQuestionNumber}
+        totalQuestions={mainQuestions.length}
+        isBranchQuestion={isBranchQuestion}
+        initialAnswer={state.answers[state.currentQuestion.id]}
+        validationError={state.validationError}
+        canGoBack={state.history.length > 0}
+        onAnswer={handleAnswer}
+        onBack={() => dispatch({ type: "BACK" })}
+        onFinish={() => dispatch({ type: "FINISH" })}
+      />
     </section>
   );
 }

@@ -29,11 +29,15 @@ export function QuestionnaireMap({
   const groupedQuestions = groupQuestionsBySection(questionnaire);
 
   return (
-    <aside className="runner-sidebar">
-      <div className="runner-sidebar-card">
-        <div className="runner-sidebar-header">
+    <div className="runner-navigator">
+      <details className="navigator-panel route-panel">
+        <summary>
           <span>Маршрут</span>
           <strong>{completedRoute.length + 1}</strong>
+        </summary>
+
+        <div className="runner-sidebar-header">
+          <span>Пройденные вопросы и текущий шаг</span>
         </div>
 
         <div className="route-list">
@@ -66,9 +70,9 @@ export function QuestionnaireMap({
             <small>Текущий вопрос</small>
           </div>
         </div>
-      </div>
+      </details>
 
-      <details className="runner-sidebar-card map-card">
+      <details className="navigator-panel map-card">
         <summary>Схема вопросов</summary>
 
         <div className="question-map">
@@ -116,7 +120,7 @@ export function QuestionnaireMap({
           ))}
         </div>
       </details>
-    </aside>
+    </div>
   );
 }
 
