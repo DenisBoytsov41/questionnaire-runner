@@ -26,6 +26,11 @@ export function JsonUploadPage({ onQuestionnairesLoaded }: JsonUploadPageProps) 
   function handleLoadFromText() {
     setErrors([]);
 
+    if (!rawJson.trim()) {
+      setErrors(["Вставьте JSON опросника в поле или выберите JSON-файл."]);
+      return;
+    }
+
     const result = parseQuestionnaireJsonText(rawJson);
 
     if (!result.ok) {
@@ -34,6 +39,25 @@ export function JsonUploadPage({ onQuestionnairesLoaded }: JsonUploadPageProps) 
     }
 
     loadQuestionnaires(result.questionnaires);
+  }
+
+  async function handlePasteFromClipboard() {
+    setErrors([]);
+
+    try {
+      const clipboardText = await navigator.clipboard.readText();
+
+      if (!clipboardText.trim()) {
+        setErrors(["В буфере обмена нет текста с JSON."]);
+        return;
+      }
+
+      setRawJson(clipboardText);
+    } catch {
+      setErrors([
+        "Браузер не дал доступ к буферу обмена. Кликните в поле ниже и нажмите Ctrl+V.",
+      ]);
+    }
   }
 
   async function handleFileChange(file: File | null) {
@@ -72,12 +96,29 @@ export function JsonUploadPage({ onQuestionnairesLoaded }: JsonUploadPageProps) 
           />
         </label>
 
-        <textarea
-          className="json-textarea"
-          value={rawJson}
-          onChange={(event) => setRawJson(event.target.value)}
-          placeholder="Вставьте JSON опросника сюда"
-        />
+        <div className="json-paste-panel">
+          <div className="json-paste-header">
+            <label htmlFor="questionnaire-json">JSON опросника</label>
+
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={handlePasteFromClipboard}
+            >
+              Вставить из буфера
+            </button>
+          </div>
+
+          <textarea
+            id="questionnaire-json"
+            className="json-textarea"
+            value={rawJson}
+            onChange={(event) => setRawJson(event.target.value)}
+            placeholder='Кликните сюда и нажмите Ctrl+V, либо используйте кнопку "Вставить из буфера"'
+            autoFocus
+            spellCheck={false}
+          />
+        </div>
 
         {errors.length > 0 && (
           <div className="validation-error">

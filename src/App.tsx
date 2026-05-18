@@ -13,7 +13,7 @@ function App() {
   const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
-    loadQuestionnaireFromPublic("kkt-checklist.json").then((result) => {
+    loadQuestionnaireFromPublic("Чек-лист звонка по ККТ.json").then((result) => {
       if (result.ok) {
         setQuestionnaires(result.questionnaires);
         setLoadError("");
@@ -27,7 +27,7 @@ function App() {
 
       setLoadError(
         [
-          "Тестовый файл public/questionnaires/kkt-checklist.json не найден или содержит ошибки.",
+          "Тестовый файл public/questionnaires/Чек-лист звонка по ККТ.json не найден или содержит ошибки.",
           "Можно загрузить JSON вручную.",
           ...result.errors,
         ].join("\n"),
