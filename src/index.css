@@ -1,11 +1,25 @@
 :root {
+  --ks-ink: #061a18;
+  --ks-muted: #5d716e;
+  --ks-brand: #00877f;
+  --ks-brand-dark: #00645e;
+  --ks-brand-deep: #063f3b;
+  --ks-brand-soft: #e4f5f2;
+  --ks-brand-pale: #f2fbf9;
+  --ks-line: #cfe1df;
+  --ks-surface: #ffffff;
+  --ks-surface-soft: #f7fbfa;
+  --ks-warning-bg: #fff7ed;
+  --ks-warning-text: #9a3412;
+  --ks-danger-bg: #fef2f2;
+  --ks-danger-text: #991b1b;
   font-family:
     "Aptos",
     "Segoe UI Variable",
     "Segoe UI",
     sans-serif;
-  color: #0f172a;
-  background: #f8fafc;
+  color: var(--ks-ink);
+  background: var(--ks-brand-pale);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
@@ -19,9 +33,9 @@ body {
   min-width: 320px;
   min-height: 100vh;
   background:
-    radial-gradient(circle at 8% 0%, rgba(37, 99, 235, 0.16), transparent 34rem),
-    radial-gradient(circle at 95% 12%, rgba(20, 184, 166, 0.1), transparent 28rem),
-    linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%);
+    radial-gradient(circle at 8% 0%, rgba(0, 135, 127, 0.16), transparent 34rem),
+    radial-gradient(circle at 95% 12%, rgba(6, 63, 59, 0.1), transparent 28rem),
+    linear-gradient(180deg, #f7fcfb 0%, #edf7f5 100%);
 }
 
 button,
@@ -47,12 +61,12 @@ select {
   justify-content: center;
   gap: 7px;
   min-width: 120px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--ks-line);
   border-radius: 14px;
-  background: #ffffff;
+  background: var(--ks-surface);
   padding: 14px 24px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--ks-ink);
   cursor: pointer;
   transition:
     border-color 0.15s ease,
@@ -67,23 +81,23 @@ select {
 .answer-choice-button small {
   padding: 3px 6px;
   border-radius: 999px;
-  background: #f1f5f9;
-  color: #64748b;
+  background: var(--ks-brand-soft);
+  color: var(--ks-brand-deep);
   font-size: 11px;
   font-weight: 800;
   line-height: 1;
 }
 
 .answer-choice-button:hover {
-  border-color: #2563eb;
-  background: #eff6ff;
+  border-color: var(--ks-brand);
+  background: var(--ks-brand-pale);
   transform: translateY(-1px);
 }
 
 .answer-choice-button.selected {
-  border-color: #2563eb;
-  background: #dbeafe;
-  color: #1d4ed8;
+  border-color: var(--ks-brand);
+  background: var(--ks-brand-soft);
+  color: var(--ks-brand-dark);
 }
 
 .question-actions {
@@ -98,15 +112,15 @@ select {
   background: linear-gradient(
     180deg,
     rgba(255, 255, 255, 0),
-    #ffffff 28%,
-    #ffffff 100%
+    var(--ks-surface) 28%,
+    var(--ks-surface) 100%
   );
 }
 
 .keyboard-hint {
   margin-top: 10px;
   text-align: right;
-  color: #64748b;
+  color: var(--ks-muted);
   font-size: 13px;
 }
 
@@ -114,8 +128,8 @@ select {
   margin-top: 14px;
   border: 1px solid #fecaca;
   border-radius: 12px;
-  background: #fef2f2;
+  background: var(--ks-danger-bg);
   padding: 12px 14px;
-  color: #b91c1c;
+  color: var(--ks-danger-text);
   font-weight: 600;
 }
