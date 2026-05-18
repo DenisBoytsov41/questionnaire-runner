@@ -12,10 +12,17 @@ export interface RunnerState {
   currentQuestion: QuestionnaireQuestion | null;
   answers: AnswersMap;
   history: string[];
-  messages: string[];
-  verdicts: string[];
+  messages: AppliedRunnerText[];
+  verdicts: AppliedRunnerText[];
   isFinished: boolean;
   validationError: string;
+  startedAt: string;
+  finishedAt: string | null;
+}
+
+export interface AppliedRunnerText {
+  questionId: string;
+  text: string;
 }
 
 export type RunnerAction =
@@ -45,6 +52,8 @@ export function createInitialRunnerState(questionnaire: Questionnaire): RunnerSt
     verdicts: [],
     isFinished: false,
     validationError: "",
+    startedAt: new Date().toISOString(),
+    finishedAt: null,
   };
 }
 
@@ -59,6 +68,7 @@ export function runnerReducer(state: RunnerState, action: RunnerAction): RunnerS
       isFinished: true,
       currentQuestion: null,
       validationError: "",
+      finishedAt: new Date().toISOString(),
     };
   }
 
@@ -83,6 +93,7 @@ export function runnerReducer(state: RunnerState, action: RunnerAction): RunnerS
       history: state.history.slice(0, -1),
       isFinished: false,
       validationError: "",
+      finishedAt: null,
     };
   }
 
@@ -108,29 +119,50 @@ export function runnerReducer(state: RunnerState, action: RunnerAction): RunnerS
       answer,
     );
 
-    const messages = [...state.messages];
-    const verdicts = [...state.verdicts];
+    const actualRouteIds = [...state.history, currentQuestion.id];
+    const actualRouteIdSet = new Set(actualRouteIds);
+    const answers = actualRouteIds.reduce<AnswersMap>((result, questionId) => {
+      if (questionId === currentQuestion.id) {
+        result[questionId] = answer;
+        return result;
+      }
+
+      if (Object.prototype.hasOwnProperty.call(state.answers, questionId)) {
+        result[questionId] = state.answers[questionId];
+      }
+
+      return result;
+    }, {});
+
+    const messages = state.messages.filter((item) => actualRouteIdSet.has(item.questionId));
+    const verdicts = state.verdicts.filter((item) => actualRouteIdSet.has(item.questionId));
 
     if (transition.message.trim()) {
-      messages.push(transition.message.trim());
+      messages.push({
+        questionId: currentQuestion.id,
+        text: transition.message.trim(),
+      });
     }
 
     if (transition.verdict.trim()) {
-      verdicts.push(transition.verdict.trim());
+      verdicts.push({
+        questionId: currentQuestion.id,
+        text: transition.verdict.trim(),
+      });
     }
 
     return {
       ...state,
-      answers: {
-        ...state.answers,
-        [currentQuestion.id]: answer,
-      },
-      history: [...state.history, currentQuestion.id],
+      answers,
+      history: actualRouteIds,
       currentQuestion: transition.nextQuestion,
       isFinished: transition.isFinished || transition.nextQuestion === null,
       messages,
       verdicts,
       validationError: "",
+      finishedAt: transition.isFinished || transition.nextQuestion === null
+        ? new Date().toISOString()
+        : null,
     };
   }
 

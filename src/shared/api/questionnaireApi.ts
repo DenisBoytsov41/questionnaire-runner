@@ -4,6 +4,7 @@ import {
   type Questionnaire,
   type QuestionnaireInput,
 } from "../../entities/questionnaire/schema";
+import { validateQuestionnaireContract } from "../../entities/questionnaire/validation";
 
 export type QuestionnaireParseResult =
   | {
@@ -64,11 +65,20 @@ export function parseQuestionnaireJsonText(text: string): QuestionnaireParseResu
   }
 
   const input = parsed.data;
+  const questionnaires = isQuestionnaireBundle(input) ? input.questionnaires : [input];
+  const contractErrors = questionnaires.flatMap(validateQuestionnaireContract);
+
+  if (contractErrors.length > 0) {
+    return {
+      ok: false,
+      errors: contractErrors,
+    };
+  }
 
   return {
     ok: true,
     input,
-    questionnaires: isQuestionnaireBundle(input) ? input.questionnaires : [input],
+    questionnaires,
   };
 }
 

@@ -39,8 +39,11 @@ export function QuestionnaireRunner({ questionnaire }: QuestionnaireRunnerProps)
       <SummaryPage
         questionnaire={questionnaire}
         answers={state.answers}
-        messages={state.messages}
-        verdicts={state.verdicts}
+        messages={state.messages.map((message) => message.text)}
+        verdicts={state.verdicts.map((verdict) => verdict.text)}
+        route={state.history}
+        startedAt={state.startedAt}
+        finishedAt={state.finishedAt}
         onRestart={() => dispatch({ type: "RESET" })}
       />
     );

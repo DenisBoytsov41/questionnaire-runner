@@ -269,6 +269,12 @@ p {
   margin: 24px 0;
 }
 
+.summary-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .summary-item {
   padding: 16px 0;
   border-bottom: 1px solid #e2e8f0;
@@ -323,7 +329,8 @@ p {
   }
 
   .answer-buttons,
-  .question-actions {
+  .question-actions,
+  .summary-actions {
     flex-direction: column;
   }
 
