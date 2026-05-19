@@ -11,6 +11,8 @@ interface QuestionnaireMapProps {
   questionnaire: Questionnaire;
   currentQuestionId: string;
   completedRoute: string[];
+  totalQuestions: number;
+  onBack: () => void;
   onNavigateToQuestion: (questionId: string) => void;
 }
 
@@ -18,38 +20,48 @@ export function QuestionnaireMap({
   questionnaire,
   currentQuestionId,
   completedRoute,
+  totalQuestions,
+  onBack,
   onNavigateToQuestion,
 }: QuestionnaireMapProps) {
   const completedQuestionIds = new Set(completedRoute);
   const routeQuestionIds = new Set([...completedRoute, currentQuestionId]);
   const groupedQuestions = groupQuestionsBySection(questionnaire);
-  const previousQuestionId = completedRoute[completedRoute.length - 1];
   const currentQuestion = questionnaire.questions.find((question) => question.id === currentQuestionId);
+  const currentStep = Math.min(completedRoute.length + 1, totalQuestions);
+  const progressValue = totalQuestions > 0 ? Math.round((currentStep / totalQuestions) * 100) : 0;
 
   return (
     <div className="runner-navigator">
-      <div className="navigator-panel route-panel">
-        <div className="route-compact">
+      <section className="navigator-panel route-panel" aria-label="Маршрут прохождения">
+        <div className="route-card-header">
           <div>
-            <span>Маршрут</span>
-            <strong>{completedRoute.length + 1}. {currentQuestion?.title}</strong>
+            <span className="panel-kicker">Маршрут</span>
+            <strong>{currentStep} из {totalQuestions}</strong>
           </div>
-
-          <button
-            type="button"
-            className="secondary-button route-back-button"
-            disabled={!previousQuestionId}
-            onClick={() => previousQuestionId && onNavigateToQuestion(previousQuestionId)}
-          >
-            Назад по маршруту
-          </button>
+          <span className="route-progress-percent">{progressValue}%</span>
         </div>
-      </div>
+
+        <div className="route-progress-track" aria-hidden="true">
+          <span style={{ width: `${progressValue}%` }} />
+        </div>
+
+        <p className="route-current-question">{currentQuestion?.title}</p>
+
+        <button
+          type="button"
+          className="secondary-button route-back-button"
+          disabled={completedRoute.length === 0}
+          onClick={onBack}
+        >
+          Назад к предыдущему вопросу
+        </button>
+      </section>
 
       <details className="navigator-panel map-card">
         <summary>Схема вопросов</summary>
 
-        <div className="question-map">
+        <div className="question-map" id="question-map">
           {groupedQuestions.map((group) => (
             <section key={group.sectionTitle} className="question-map-section">
               <h3>{group.sectionTitle}</h3>
@@ -61,7 +73,7 @@ export function QuestionnaireMap({
                 const rules = question.rules ?? [];
 
                 return (
-                  <div
+                  <article
                     key={question.id}
                     className={[
                       "question-map-item",
@@ -71,7 +83,7 @@ export function QuestionnaireMap({
                   >
                     <button
                       type="button"
-                      disabled={!isCompleted}
+                      disabled={!isCompleted || isCurrent}
                       onClick={() => onNavigateToQuestion(question.id)}
                     >
                       <span>{isCurrent ? "Сейчас" : isCompleted ? "Пройден" : isInRoute ? "В маршруте" : "Не пройден"}</span>
@@ -82,12 +94,12 @@ export function QuestionnaireMap({
                       <div className="question-rule-list">
                         {rules.map((rule) => (
                           <small key={`${question.id}-${rule.value}-${rule.action}`}>
-                            {rule.value} {"->"} {formatRuleTarget(questionnaire, rule.question_id, rule.action)}
+                            {formatRuleValue(rule.value)} {"->"} {formatRuleTarget(questionnaire, rule.question_id, rule.action)}
                           </small>
                         ))}
                       </div>
                     )}
-                  </div>
+                  </article>
                 );
               })}
             </section>
@@ -119,6 +131,18 @@ function groupQuestionsBySection(questionnaire: Questionnaire): QuestionGroup[] 
   });
 
   return Array.from(groups.values());
+}
+
+function formatRuleValue(value: string | boolean | number | null): string {
+  if (value === true || value === "true") {
+    return "Да";
+  }
+
+  if (value === false || value === "false") {
+    return "Нет";
+  }
+
+  return value === null ? "Любой ответ" : String(value);
 }
 
 function formatRuleTarget(

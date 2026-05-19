@@ -64,53 +64,18 @@ export function QuestionnaireRunner({ questionnaire }: QuestionnaireRunnerProps)
 
   return (
     <div className="runner-layout">
-      <aside className="runner-rail" aria-label="Инструменты опросника">
-        <div className="runner-rail-card">
-          <span>Шаг</span>
-          <strong>{state.history.length + 1}</strong>
-          <small>из {mainQuestions.length}</small>
-        </div>
-
-        <a className="runner-rail-link" href="#question-map">
-          Схема
-        </a>
-
-        <button
-          type="button"
-          className="runner-rail-link"
-          disabled={state.history.length === 0}
-          onClick={() => dispatch({ type: "BACK" })}
-        >
-          Назад
-        </button>
-      </aside>
-
-      <section className="runner-page">
-        <div className="runner-header">
+      <main className="runner-page">
+        <section className="runner-header" aria-labelledby="runner-title">
           <p className="page-kicker">Интерактивный опросник</p>
-          <h1>{questionnaire.title}</h1>
+          <h1 id="runner-title">{questionnaire.title}</h1>
           <p>{questionnaire.start_text}</p>
-        </div>
-
-        <QuestionnaireMap
-          questionnaire={questionnaire}
-          currentQuestionId={state.currentQuestion.id}
-          completedRoute={state.history}
-          onNavigateToQuestion={(questionId) => {
-            dispatch({
-              type: "NAVIGATE_TO_ROUTE",
-              payload: {
-                questionId,
-              },
-            });
-          }}
-        />
+        </section>
 
         {section && (
-          <div className="section-banner">
+          <section className="section-banner" aria-label="Текущий раздел">
             <strong>{section.title}</strong>
             {section.description && <span>{section.description}</span>}
-          </div>
+          </section>
         )}
 
         <QuestionCard
@@ -126,7 +91,25 @@ export function QuestionnaireRunner({ questionnaire }: QuestionnaireRunnerProps)
           onBack={() => dispatch({ type: "BACK" })}
           onFinish={() => dispatch({ type: "FINISH" })}
         />
-      </section>
+      </main>
+
+      <aside className="runner-side-panel" aria-label="Навигация по опроснику">
+        <QuestionnaireMap
+          questionnaire={questionnaire}
+          currentQuestionId={state.currentQuestion.id}
+          completedRoute={state.history}
+          totalQuestions={mainQuestions.length}
+          onBack={() => dispatch({ type: "BACK" })}
+          onNavigateToQuestion={(questionId) => {
+            dispatch({
+              type: "NAVIGATE_TO_ROUTE",
+              payload: {
+                questionId,
+              },
+            });
+          }}
+        />
+      </aside>
     </div>
   );
 }
