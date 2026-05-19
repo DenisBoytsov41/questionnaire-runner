@@ -1,10 +1,8 @@
 import {
-  formatAnswerForSummary,
   getActiveQuestions,
   getSectionById,
 } from "../../../entities/questionnaire/helpers";
 import type {
-  AnswersMap,
   Questionnaire,
   QuestionnaireQuestion,
 } from "../../../entities/questionnaire/types";
@@ -13,7 +11,6 @@ interface QuestionnaireMapProps {
   questionnaire: Questionnaire;
   currentQuestionId: string;
   completedRoute: string[];
-  answers: AnswersMap;
   onNavigateToQuestion: (questionId: string) => void;
 }
 
@@ -21,7 +18,6 @@ export function QuestionnaireMap({
   questionnaire,
   currentQuestionId,
   completedRoute,
-  answers,
   onNavigateToQuestion,
 }: QuestionnaireMapProps) {
   const completedQuestionIds = new Set(completedRoute);
@@ -48,15 +44,12 @@ export function QuestionnaireMap({
             Назад по маршруту
           </button>
         </div>
-      </div>
-
-      <details className="navigator-panel map-card">
-        <summary>Схема вопросов</summary>
 
         {completedRoute.length > 0 && (
-          <div className="route-list">
-            {completedRoute.map((questionId, index) => {
+          <div className="route-mini-list">
+            {completedRoute.slice(-5).map((questionId, index) => {
               const question = questionnaire.questions.find((item) => item.id === questionId);
+              const routeNumber = completedRoute.length - completedRoute.slice(-5).length + index + 1;
 
               if (!question) {
                 return null;
@@ -64,19 +57,22 @@ export function QuestionnaireMap({
 
               return (
                 <button
-                  key={`${questionId}-${index}`}
+                  key={`${questionId}-${routeNumber}`}
                   type="button"
-                  className="route-step route-step-completed"
+                  className="route-mini-step"
                   onClick={() => onNavigateToQuestion(questionId)}
                 >
-                  <span>{index + 1}</span>
-                  <strong>{question.title}</strong>
-                  <small>{formatAnswerForSummary(question, answers[question.id])}</small>
+                  <span>{routeNumber}</span>
+                  {question.title}
                 </button>
               );
             })}
           </div>
         )}
+      </div>
+
+      <details className="navigator-panel map-card">
+        <summary>Схема вопросов</summary>
 
         <div className="question-map">
           {groupedQuestions.map((group) => (

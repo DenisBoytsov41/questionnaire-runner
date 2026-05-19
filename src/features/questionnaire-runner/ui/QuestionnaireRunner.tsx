@@ -74,7 +74,6 @@ export function QuestionnaireRunner({ questionnaire }: QuestionnaireRunnerProps)
         questionnaire={questionnaire}
         currentQuestionId={state.currentQuestion.id}
         completedRoute={state.history}
-        answers={state.answers}
         onNavigateToQuestion={(questionId) => {
           dispatch({
             type: "NAVIGATE_TO_ROUTE",
