@@ -27,53 +27,56 @@ export function QuestionnaireMap({
   const completedQuestionIds = new Set(completedRoute);
   const routeQuestionIds = new Set([...completedRoute, currentQuestionId]);
   const groupedQuestions = groupQuestionsBySection(questionnaire);
+  const previousQuestionId = completedRoute[completedRoute.length - 1];
+  const currentQuestion = questionnaire.questions.find((question) => question.id === currentQuestionId);
 
   return (
     <div className="runner-navigator">
-      <details className="navigator-panel route-panel">
-        <summary>
-          <span>Маршрут</span>
-          <strong>{completedRoute.length + 1}</strong>
-        </summary>
-
-        <div className="runner-sidebar-header">
-          <span>Пройденные вопросы и текущий шаг</span>
-        </div>
-
-        <div className="route-list">
-          {completedRoute.map((questionId, index) => {
-            const question = questionnaire.questions.find((item) => item.id === questionId);
-
-            if (!question) {
-              return null;
-            }
-
-            return (
-              <button
-                key={`${questionId}-${index}`}
-                type="button"
-                className="route-step route-step-completed"
-                onClick={() => onNavigateToQuestion(questionId)}
-              >
-                <span>{index + 1}</span>
-                <strong>{question.title}</strong>
-                <small>{formatAnswerForSummary(question, answers[question.id])}</small>
-              </button>
-            );
-          })}
-
-          <div className="route-step route-step-current">
-            <span>{completedRoute.length + 1}</span>
-            <strong>
-              {questionnaire.questions.find((question) => question.id === currentQuestionId)?.title}
-            </strong>
-            <small>Текущий вопрос</small>
+      <div className="navigator-panel route-panel">
+        <div className="route-compact">
+          <div>
+            <span>Маршрут</span>
+            <strong>{completedRoute.length + 1}. {currentQuestion?.title}</strong>
           </div>
+
+          <button
+            type="button"
+            className="secondary-button route-back-button"
+            disabled={!previousQuestionId}
+            onClick={() => previousQuestionId && onNavigateToQuestion(previousQuestionId)}
+          >
+            Назад по маршруту
+          </button>
         </div>
-      </details>
+      </div>
 
       <details className="navigator-panel map-card">
         <summary>Схема вопросов</summary>
+
+        {completedRoute.length > 0 && (
+          <div className="route-list">
+            {completedRoute.map((questionId, index) => {
+              const question = questionnaire.questions.find((item) => item.id === questionId);
+
+              if (!question) {
+                return null;
+              }
+
+              return (
+                <button
+                  key={`${questionId}-${index}`}
+                  type="button"
+                  className="route-step route-step-completed"
+                  onClick={() => onNavigateToQuestion(questionId)}
+                >
+                  <span>{index + 1}</span>
+                  <strong>{question.title}</strong>
+                  <small>{formatAnswerForSummary(question, answers[question.id])}</small>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         <div className="question-map">
           {groupedQuestions.map((group) => (
