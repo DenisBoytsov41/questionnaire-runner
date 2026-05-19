@@ -571,6 +571,15 @@ p {
     white-space: normal;
   }
 
+  .runner-rail {
+    position: static;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    width: auto;
+    max-width: 760px;
+    margin: 0 auto 12px;
+  }
+
   .answer-button,
   .primary-button,
   .secondary-button {
@@ -659,6 +668,63 @@ p {
 .upload-page,
 .runner-page {
   max-width: 760px;
+}
+
+.runner-layout {
+  position: relative;
+  max-width: 1060px;
+  margin: 0 auto;
+}
+
+.runner-rail {
+  position: fixed;
+  top: 160px;
+  left: max(18px, calc(50% - 560px));
+  display: grid;
+  gap: 10px;
+  width: 118px;
+}
+
+.runner-rail-card,
+.runner-rail-link {
+  border: 1px solid #d7e4e2;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 3px 10px rgba(6, 63, 59, 0.04);
+}
+
+.runner-rail-card {
+  display: grid;
+  gap: 2px;
+  padding: 14px;
+}
+
+.runner-rail-card span,
+.runner-rail-card small {
+  color: var(--ks-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.runner-rail-card strong {
+  color: var(--ks-brand-dark);
+  font-size: 28px;
+  line-height: 1;
+}
+
+.runner-rail-link {
+  display: inline-flex;
+  justify-content: center;
+  padding: 11px 12px;
+  color: var(--ks-brand-dark);
+  cursor: pointer;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.runner-rail-link:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
 }
 
 .top-bar {
@@ -973,10 +1039,7 @@ p {
 }
 
 .route-mini-list {
-  display: flex;
-  gap: 8px;
-  overflow: auto;
-  padding: 0 18px 14px;
+  display: none;
 }
 
 .route-mini-step {

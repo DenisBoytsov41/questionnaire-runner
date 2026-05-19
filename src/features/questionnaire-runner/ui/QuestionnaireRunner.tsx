@@ -63,47 +63,70 @@ export function QuestionnaireRunner({ questionnaire }: QuestionnaireRunnerProps)
   }
 
   return (
-    <section className="runner-page">
-      <div className="runner-header">
-        <p className="page-kicker">Интерактивный опросник</p>
-        <h1>{questionnaire.title}</h1>
-        <p>{questionnaire.start_text}</p>
-      </div>
-
-      <QuestionnaireMap
-        questionnaire={questionnaire}
-        currentQuestionId={state.currentQuestion.id}
-        completedRoute={state.history}
-        onNavigateToQuestion={(questionId) => {
-          dispatch({
-            type: "NAVIGATE_TO_ROUTE",
-            payload: {
-              questionId,
-            },
-          });
-        }}
-      />
-
-      {section && (
-        <div className="section-banner">
-          <strong>{section.title}</strong>
-          {section.description && <span>{section.description}</span>}
+    <div className="runner-layout">
+      <aside className="runner-rail" aria-label="Инструменты опросника">
+        <div className="runner-rail-card">
+          <span>Шаг</span>
+          <strong>{state.history.length + 1}</strong>
+          <small>из {mainQuestions.length}</small>
         </div>
-      )}
 
-      <QuestionCard
-        key={state.currentQuestion.id}
-        question={state.currentQuestion}
-        questionNumber={currentQuestionNumber}
-        totalQuestions={mainQuestions.length}
-        isBranchQuestion={isBranchQuestion}
-        initialAnswer={state.answers[state.currentQuestion.id]}
-        validationError={state.validationError}
-        canGoBack={state.history.length > 0}
-        onAnswer={handleAnswer}
-        onBack={() => dispatch({ type: "BACK" })}
-        onFinish={() => dispatch({ type: "FINISH" })}
-      />
-    </section>
+        <a className="runner-rail-link" href="#question-map">
+          Схема
+        </a>
+
+        <button
+          type="button"
+          className="runner-rail-link"
+          disabled={state.history.length === 0}
+          onClick={() => dispatch({ type: "BACK" })}
+        >
+          Назад
+        </button>
+      </aside>
+
+      <section className="runner-page">
+        <div className="runner-header">
+          <p className="page-kicker">Интерактивный опросник</p>
+          <h1>{questionnaire.title}</h1>
+          <p>{questionnaire.start_text}</p>
+        </div>
+
+        <QuestionnaireMap
+          questionnaire={questionnaire}
+          currentQuestionId={state.currentQuestion.id}
+          completedRoute={state.history}
+          onNavigateToQuestion={(questionId) => {
+            dispatch({
+              type: "NAVIGATE_TO_ROUTE",
+              payload: {
+                questionId,
+              },
+            });
+          }}
+        />
+
+        {section && (
+          <div className="section-banner">
+            <strong>{section.title}</strong>
+            {section.description && <span>{section.description}</span>}
+          </div>
+        )}
+
+        <QuestionCard
+          key={state.currentQuestion.id}
+          question={state.currentQuestion}
+          questionNumber={currentQuestionNumber}
+          totalQuestions={mainQuestions.length}
+          isBranchQuestion={isBranchQuestion}
+          initialAnswer={state.answers[state.currentQuestion.id]}
+          validationError={state.validationError}
+          canGoBack={state.history.length > 0}
+          onAnswer={handleAnswer}
+          onBack={() => dispatch({ type: "BACK" })}
+          onFinish={() => dispatch({ type: "FINISH" })}
+        />
+      </section>
+    </div>
   );
 }

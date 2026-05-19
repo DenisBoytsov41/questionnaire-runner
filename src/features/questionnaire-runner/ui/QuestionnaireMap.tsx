@@ -44,31 +44,6 @@ export function QuestionnaireMap({
             Назад по маршруту
           </button>
         </div>
-
-        {completedRoute.length > 0 && (
-          <div className="route-mini-list">
-            {completedRoute.slice(-5).map((questionId, index) => {
-              const question = questionnaire.questions.find((item) => item.id === questionId);
-              const routeNumber = completedRoute.length - completedRoute.slice(-5).length + index + 1;
-
-              if (!question) {
-                return null;
-              }
-
-              return (
-                <button
-                  key={`${questionId}-${routeNumber}`}
-                  type="button"
-                  className="route-mini-step"
-                  onClick={() => onNavigateToQuestion(questionId)}
-                >
-                  <span>{routeNumber}</span>
-                  {question.title}
-                </button>
-              );
-            })}
-          </div>
-        )}
       </div>
 
       <details className="navigator-panel map-card">
