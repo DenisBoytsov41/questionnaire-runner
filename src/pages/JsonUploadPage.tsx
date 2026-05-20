@@ -103,7 +103,7 @@ export function JsonUploadPage({ onQuestionnairesLoaded }: JsonUploadPageProps) 
               className="secondary-button"
               onClick={handlePasteFromClipboard}
             >
-              Вставить текст из буфера
+              Вставить из буфера обмена
             </button>
           </div>
 
@@ -118,7 +118,7 @@ export function JsonUploadPage({ onQuestionnairesLoaded }: JsonUploadPageProps) 
               className="json-textarea"
               value={rawJson}
               onChange={(event) => setRawJson(event.target.value)}
-              placeholder='Нажмите сюда и вставьте текст файла, либо используйте кнопку "Вставить текст из буфера"'
+              placeholder='Нажмите сюда и вставьте текст файла, либо используйте кнопку "Вставить из буфера обмена"'
               autoFocus
               spellCheck={false}
             />

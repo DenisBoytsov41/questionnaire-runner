@@ -132,7 +132,7 @@ export function SummaryPage({
 
               {verdicts.length > 0 && (
                 <div className="verdict-block">
-                  <h2>Вердикты</h2>
+                  <h2>Итоговые действия</h2>
                   {verdicts.map((verdict, index) => (
                     <p key={`${verdict}-${index}`}>{verdict}</p>
                   ))}
@@ -197,9 +197,9 @@ export function SummaryPage({
           <div className="summary-panel">
             <h2>Данные прохождения</h2>
             <p className="summary-technical">Маршрут: {route.length} шагов</p>
-            <p className="summary-technical">Старт: {formatDateTime(startedAt)}</p>
+            <p className="summary-technical">Начало: {formatDateTime(startedAt)}</p>
             <p className="summary-technical">
-              Финиш: {formatDateTime(finishedAt ?? new Date().toISOString())}
+              Завершение: {formatDateTime(finishedAt ?? new Date().toISOString())}
             </p>
           </div>
         </aside>

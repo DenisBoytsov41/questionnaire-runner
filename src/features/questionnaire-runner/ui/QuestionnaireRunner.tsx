@@ -98,7 +98,7 @@ export function QuestionnaireRunner({ questionnaire }: QuestionnaireRunnerProps)
     <div className="runner-layout">
       <main className="runner-page">
         <section className="runner-header" aria-labelledby="runner-title">
-          <p className="page-kicker">Интерактивный опросник</p>
+          <p className="page-kicker">Рабочий опросник</p>
           <h1 id="runner-title">{questionnaire.title}</h1>
           <p>{questionnaire.start_text}</p>
         </section>

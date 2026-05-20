@@ -13,6 +13,8 @@
   --ks-warning-text: #9a3412;
   --ks-danger-bg: #fef2f2;
   --ks-danger-text: #991b1b;
+  --ks-text-scale: 1;
+  --ks-page-bg: #f3f6f5;
   font-family:
     "Aptos",
     "Segoe UI Variable",
@@ -24,6 +26,50 @@
   text-rendering: optimizeLegibility;
 }
 
+html[data-text-scale="large"] {
+  --ks-text-scale: 1.08;
+}
+
+html[data-text-scale="extra"] {
+  --ks-text-scale: 1.18;
+}
+
+html[data-theme="dark"] {
+  --ks-ink: #eefaf7;
+  --ks-muted: #aac5bf;
+  --ks-brand: #21b8ac;
+  --ks-brand-dark: #66d8cf;
+  --ks-brand-deep: #082e2a;
+  --ks-brand-soft: #143f3a;
+  --ks-brand-pale: #071b19;
+  --ks-line: #28544f;
+  --ks-surface: #0b2421;
+  --ks-surface-soft: #102f2b;
+  --ks-warning-bg: #3d2f19;
+  --ks-warning-text: #ffdca6;
+  --ks-danger-bg: #3f171b;
+  --ks-danger-text: #ffc4c8;
+  --ks-page-bg: #071b19;
+}
+
+html[data-vision="easy"] {
+  --ks-ink: #001917;
+  --ks-muted: #263d39;
+  --ks-brand: #00766f;
+  --ks-brand-dark: #005c57;
+  --ks-brand-deep: #003f3b;
+  --ks-line: #62aaa4;
+}
+
+html[data-theme="dark"][data-vision="easy"] {
+  --ks-ink: #ffffff;
+  --ks-muted: #d6ebe7;
+  --ks-brand: #54fff0;
+  --ks-brand-dark: #99fff7;
+  --ks-brand-deep: #001f1d;
+  --ks-line: #77d8cf;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -33,7 +79,8 @@ body {
   min-width: 320px;
   min-height: 100vh;
   overflow-x: hidden;
-  background: #f3f6f5;
+  background: var(--ks-page-bg);
+  font-size: calc(16px * var(--ks-text-scale));
 }
 
 button,

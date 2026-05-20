@@ -2447,3 +2447,333 @@ select {
     font-size: 15px;
   }
 }
+
+/* Настройки вида: размер текста, тёмное оформление и повышенная читаемость. */
+.top-bar {
+  align-items: center;
+}
+
+.top-bar .top-bar-actions {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  min-width: 0;
+}
+
+.top-bar .view-settings {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: row;
+  align-items: stretch;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.view-settings-title {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: var(--ks-brand-deep);
+  color: #ffffff;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.top-bar .view-settings-group {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #dce8e6;
+  border-radius: 14px;
+  background: #f7faf9;
+}
+
+.view-settings-group > span {
+  color: var(--ks-muted);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.top-bar .view-settings-buttons {
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+}
+
+.view-settings-button {
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ks-brand-deep);
+  cursor: pointer;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.view-settings-button:hover,
+.view-settings-button.active {
+  border-color: var(--ks-brand);
+  background: #ffffff;
+  color: var(--ks-brand-dark);
+}
+
+.runner-header h1 {
+  font-size: clamp(28px, 2.5vw, 38px);
+}
+
+.question-card h2 {
+  font-size: clamp(26px, 2.4vw, 36px);
+}
+
+.upload-main-card h1,
+.summary-header h1 {
+  font-size: clamp(28px, 2.5vw, 38px);
+}
+
+.runner-header p:last-child,
+.upload-main-card > p:not(.page-kicker),
+.summary-header p:last-child {
+  font-size: 16px;
+}
+
+.route-card-header strong {
+  font-size: 24px;
+}
+
+.summary-list > h2,
+.summary-copy-preview h2,
+.summary-panel-header h2 {
+  font-size: 26px;
+}
+
+.summary-panel h2,
+.upload-side-card h2 {
+  font-size: 23px;
+}
+
+html[data-text-scale="large"] .runner-header h1,
+html[data-text-scale="large"] .upload-main-card h1,
+html[data-text-scale="large"] .summary-header h1 {
+  font-size: clamp(31px, 2.8vw, 42px);
+}
+
+html[data-text-scale="large"] .question-card h2 {
+  font-size: clamp(29px, 2.8vw, 40px);
+}
+
+html[data-text-scale="extra"] .runner-header h1,
+html[data-text-scale="extra"] .upload-main-card h1,
+html[data-text-scale="extra"] .summary-header h1 {
+  font-size: clamp(34px, 3.2vw, 46px);
+}
+
+html[data-text-scale="extra"] .question-card h2 {
+  font-size: clamp(32px, 3.2vw, 44px);
+}
+
+html[data-theme="dark"] body {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(33, 184, 172, 0.18), transparent 32%),
+    linear-gradient(180deg, #071b19, #0a211f 46%, #061513);
+}
+
+html[data-theme="dark"] .top-bar,
+html[data-theme="dark"] .runner-header,
+html[data-theme="dark"] .question-card,
+html[data-theme="dark"] .section-banner,
+html[data-theme="dark"] .navigator-panel,
+html[data-theme="dark"] .upload-main-card,
+html[data-theme="dark"] .upload-side-card,
+html[data-theme="dark"] .summary-header,
+html[data-theme="dark"] .summary-panel,
+html[data-theme="dark"] .summary-section-card,
+html[data-theme="dark"] .questionnaire-card,
+html[data-theme="dark"] .select-header,
+html[data-theme="dark"] .summary-copy-preview {
+  border-color: var(--ks-line);
+  background: rgba(11, 36, 33, 0.96);
+  color: var(--ks-ink);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.24);
+}
+
+html[data-theme="dark"] .application-panel,
+html[data-theme="dark"] .draft-status-card {
+  background:
+    linear-gradient(135deg, rgba(33, 184, 172, 0.13), rgba(11, 36, 33, 0.95)),
+    var(--ks-surface);
+}
+
+html[data-theme="dark"] .brand-logo-mark,
+html[data-theme="dark"] .application-grid div,
+html[data-theme="dark"] .summary-copy-preview pre,
+html[data-theme="dark"] .route-step,
+html[data-theme="dark"] .route-mini-step,
+html[data-theme="dark"] .checkbox-answer-item,
+html[data-theme="dark"] .field,
+html[data-theme="dark"] .answer-input,
+html[data-theme="dark"] .answer-textarea,
+html[data-theme="dark"] .json-textarea,
+html[data-theme="dark"] .question-search-input,
+html[data-theme="dark"] .upload-check-list li,
+html[data-theme="dark"] .scenario-metrics div,
+html[data-theme="dark"] .draft-status-grid div,
+html[data-theme="dark"] .view-settings-group {
+  border-color: var(--ks-line);
+  background: var(--ks-surface-soft);
+  color: var(--ks-ink);
+}
+
+html[data-theme="dark"] .question-hint,
+html[data-theme="dark"] .question-rule-list small,
+html[data-theme="dark"] .question-map-section h3,
+html[data-theme="dark"] .question-map-empty,
+html[data-theme="dark"] .route-step-current {
+  background: rgba(33, 184, 172, 0.11);
+}
+
+html[data-theme="dark"] .secondary-button,
+html[data-theme="dark"] .file-loader,
+html[data-theme="dark"] .view-settings-button.active,
+html[data-theme="dark"] .view-settings-button:hover,
+html[data-theme="dark"] .answer-choice-button {
+  background: #143f3a;
+  color: var(--ks-ink);
+  border-color: var(--ks-line);
+}
+
+html[data-theme="dark"] .primary-button,
+html[data-theme="dark"] .summary-score-card,
+html[data-theme="dark"] .route-progress-percent {
+  background: #008a82;
+  color: #ffffff;
+}
+
+html[data-theme="dark"] .question-actions {
+  background: linear-gradient(180deg, rgba(11, 36, 33, 0), var(--ks-surface) 30%, var(--ks-surface));
+}
+
+html[data-theme="dark"] .route-progress-track {
+  background: #183b37;
+}
+
+html[data-theme="dark"] .scenario-status.good {
+  background: #123c25;
+  color: #b9f7cd;
+}
+
+html[data-theme="dark"] .scenario-status.warn,
+html[data-theme="dark"] .required-pill,
+html[data-theme="dark"] .required-label,
+html[data-theme="dark"] .verdict-block,
+html[data-theme="dark"] .scenario-warning-list li {
+  border-color: #74522a;
+  background: var(--ks-warning-bg);
+  color: var(--ks-warning-text);
+}
+
+html[data-vision="easy"] body {
+  background: #f7fbfa;
+  letter-spacing: 0.01em;
+}
+
+html[data-vision="easy"] p,
+html[data-vision="easy"] .question-hint,
+html[data-vision="easy"] .keyboard-hint,
+html[data-vision="easy"] .summary-copy-preview pre {
+  line-height: 1.75;
+}
+
+html[data-vision="easy"] .top-bar,
+html[data-vision="easy"] .runner-header,
+html[data-vision="easy"] .question-card,
+html[data-vision="easy"] .section-banner,
+html[data-vision="easy"] .navigator-panel,
+html[data-vision="easy"] .upload-main-card,
+html[data-vision="easy"] .upload-side-card,
+html[data-vision="easy"] .summary-header,
+html[data-vision="easy"] .summary-panel,
+html[data-vision="easy"] .summary-section-card,
+html[data-vision="easy"] .questionnaire-card,
+html[data-vision="easy"] .select-header {
+  border-width: 2px;
+  box-shadow: none;
+}
+
+html[data-vision="easy"] .primary-button,
+html[data-vision="easy"] .secondary-button,
+html[data-vision="easy"] .answer-button,
+html[data-vision="easy"] .answer-choice-button,
+html[data-vision="easy"] .file-loader,
+html[data-vision="easy"] .view-settings-button,
+html[data-vision="easy"] .field,
+html[data-vision="easy"] .answer-input,
+html[data-vision="easy"] .answer-textarea,
+html[data-vision="easy"] .json-textarea,
+html[data-vision="easy"] .question-search-input {
+  border-width: 2px;
+}
+
+html[data-vision="easy"] :focus-visible {
+  outline: 4px solid #f59e0b;
+  outline-offset: 4px;
+}
+
+html[data-theme="dark"][data-vision="easy"] body {
+  background: #020807;
+}
+
+@media (max-width: 1180px) {
+  .top-bar .top-bar-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .top-bar .view-settings {
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+}
+
+@media (max-width: 760px) {
+  .top-bar .view-settings {
+    display: grid;
+    grid-template-columns: 1fr;
+    overflow: visible;
+  }
+
+  .view-settings-title {
+    justify-content: center;
+  }
+
+  .top-bar .view-settings-buttons {
+    flex-wrap: wrap;
+  }
+
+  .view-settings-button {
+    flex: 1 1 auto;
+  }
+
+  .runner-header h1,
+  .upload-main-card h1,
+  .summary-header h1,
+  .select-header h1 {
+    font-size: clamp(26px, 8vw, 34px);
+  }
+
+  .question-card h2 {
+    font-size: clamp(24px, 7vw, 32px);
+  }
+}
