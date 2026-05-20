@@ -38,7 +38,6 @@ export function AnswerInput({
           onClick={() => submitBooleanAnswer(true)}
         >
           <span>Да</span>
-          <small>Alt + 1</small>
         </button>
 
         <button
@@ -47,7 +46,6 @@ export function AnswerInput({
           onClick={() => submitBooleanAnswer(false)}
         >
           <span>Нет</span>
-          <small>Alt + 2</small>
         </button>
       </div>
     );

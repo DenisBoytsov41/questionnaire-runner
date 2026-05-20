@@ -16,7 +16,7 @@ export function QuestionnaireRunPage({
       <BrandHeader
         subtitle="Опросник первой линии"
         action={{
-          label: "Загрузить другой JSON",
+          label: "Загрузить другой файл",
           onClick: onResetQuestionnaire,
         }}
       />

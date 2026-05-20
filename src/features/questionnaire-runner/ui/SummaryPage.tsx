@@ -168,7 +168,7 @@ export function SummaryPage({
               </button>
 
               <button type="button" className="secondary-button" onClick={downloadResultJson}>
-                Скачать JSON
+                Скачать файл результата
               </button>
 
               <button type="button" className="secondary-button" onClick={onRestart}>
@@ -180,7 +180,7 @@ export function SummaryPage({
           </div>
 
           <div className="summary-panel">
-            <h2>Служебно</h2>
+            <h2>Данные прохождения</h2>
             <p className="summary-technical">Маршрут: {route.length} шагов</p>
             <p className="summary-technical">Старт: {formatDateTime(startedAt)}</p>
             <p className="summary-technical">

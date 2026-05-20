@@ -11,8 +11,8 @@ export function validateQuestionnaireContract(questionnaire: Questionnaire): str
 
   if (questionnaire.schema_version !== SUPPORTED_SCHEMA_VERSION) {
     errors.push(
-      `Опросник "${questionnaire.title}" имеет schema_version = ${questionnaire.schema_version}. ` +
-        `Текущая web-версия поддерживает только schema_version = ${SUPPORTED_SCHEMA_VERSION}.`,
+      `Опросник "${questionnaire.title}" имеет версию формата ${questionnaire.schema_version}. ` +
+        `Текущая страница поддерживает только версию формата ${SUPPORTED_SCHEMA_VERSION}.`,
     );
   }
 
@@ -27,19 +27,19 @@ export function validateQuestionnaireContract(questionnaire: Questionnaire): str
   addDuplicateIdErrors(
     errors,
     questionnaire.sections,
-    `В опроснике "${questionnaire.title}" несколько разделов с id`,
+    `В опроснике "${questionnaire.title}" несколько разделов с одинаковым кодом`,
   );
 
   addDuplicateIdErrors(
     errors,
     questionnaire.questions,
-    `В опроснике "${questionnaire.title}" несколько вопросов с id`,
+    `В опроснике "${questionnaire.title}" несколько вопросов с одинаковым кодом`,
   );
 
   addDuplicateOrderErrors(
     errors,
     questionnaire.sections,
-    `В опроснике "${questionnaire.title}" несколько разделов с order`,
+    `В опроснике "${questionnaire.title}" несколько разделов с одинаковым порядковым номером`,
   );
 
   validateQuestions(questionnaire, errors);
@@ -58,7 +58,7 @@ function validateQuestions(questionnaire: Questionnaire, errors: string[]) {
     addDuplicateOrderErrors(
       errors,
       questions,
-      `В опроснике "${questionnaire.title}" в группе "${sectionTitle}" несколько вопросов с order`,
+      `В опроснике "${questionnaire.title}" в группе "${sectionTitle}" несколько вопросов с одинаковым порядковым номером`,
     );
   });
 
@@ -79,19 +79,19 @@ function validateQuestionOptions(question: QuestionnaireQuestion, errors: string
 
   if ((question.answer_type === "select" || question.answer_type === "multiselect") && options.length === 0) {
     errors.push(
-      `Вопрос "${question.title}" имеет тип ${question.answer_type}, но у него нет вариантов ответа.`,
+      `Вопрос "${question.title}" имеет неподходящий тип ответа ${question.answer_type}: для него нужны варианты ответа.`,
     );
   }
 
   if (question.answer_type !== "select" && question.answer_type !== "multiselect" && options.length > 0) {
     errors.push(
-      `Вопрос "${question.title}" имеет тип ${question.answer_type}, но содержит варианты ответа. ` +
-        "Варианты допустимы только для select/multiselect.",
+      `Вопрос "${question.title}" имеет неподходящий тип ответа ${question.answer_type}, но содержит варианты ответа. ` +
+        "Варианты допустимы только для вопросов с выбором одного или нескольких вариантов.",
     );
   }
 
   addDuplicateOptionValueErrors(errors, question, options);
-  addDuplicateOrderErrors(errors, options, `В вопросе "${question.title}" несколько вариантов с order`);
+  addDuplicateOrderErrors(errors, options, `В вопросе "${question.title}" несколько вариантов с одинаковым порядковым номером`);
 }
 
 function validateQuestionRules(
@@ -108,7 +108,7 @@ function validateQuestionRules(
       if (!rule.question_id) {
         errors.push(
           `Вопрос "${question.title}": правило для ответа "${rule.value}" ведёт к вопросу, ` +
-            "но question_id не заполнен.",
+            "но код вопроса не заполнен.",
         );
         return;
       }
@@ -123,7 +123,7 @@ function validateQuestionRules(
 
     if (rule.action !== "go_to_question" && rule.question_id) {
       errors.push(
-        `Вопрос "${question.title}": у правила "${rule.value}" заполнен question_id, ` +
+        `Вопрос "${question.title}": у правила "${rule.value}" заполнен код вопроса, ` +
           `но действие ${rule.action} его не использует.`,
       );
     }
@@ -196,7 +196,7 @@ function addDuplicateOptionValueErrors(
   addDuplicateValueErrors(
     errors,
     options.map((option) => option.value),
-    `В вопросе "${question.title}" несколько вариантов с value`,
+    `В вопросе "${question.title}" несколько вариантов с одинаковым значением`,
   );
 }
 

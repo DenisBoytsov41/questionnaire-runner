@@ -15,9 +15,9 @@ export function QuestionnaireSelectPage({
   return (
     <main className="app-shell">
       <BrandHeader
-        subtitle="Выбор сценария из JSON"
+        subtitle="Выбор сценария из файла"
         action={{
-          label: "Загрузить другой JSON",
+          label: "Загрузить другой файл",
           onClick: onReset,
         }}
       />
@@ -27,7 +27,7 @@ export function QuestionnaireSelectPage({
           <p className="page-kicker">Выбор опросника</p>
           <h1>Выберите сценарий для запуска</h1>
           <p>
-            В загруженном JSON найдено несколько опросников. Выберите нужный
+            В загруженном файле найдено несколько опросников. Выберите нужный
             сценарий, после чего откроется форма прохождения.
           </p>
         </div>
@@ -53,8 +53,8 @@ export function QuestionnaireSelectPage({
               </div>
 
               <div className="questionnaire-meta">
-                <span>ID: {questionnaire.id}</span>
-                <span>Версия схемы: {questionnaire.schema_version}</span>
+                <span>Код: {questionnaire.id}</span>
+                <span>Версия формата: {questionnaire.schema_version}</span>
                 <span>Разделов: {questionnaire.sections.length}</span>
                 <span>Вопросов: {questionnaire.questions.length}</span>
               </div>

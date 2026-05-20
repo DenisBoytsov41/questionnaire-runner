@@ -35,7 +35,7 @@ export async function loadQuestionnaireFromPublic(
   } catch (error) {
     return {
       ok: false,
-      errors: [`Ошибка загрузки JSON: ${getErrorMessage(error)}`],
+      errors: [`Ошибка загрузки файла сценария: ${getErrorMessage(error)}`],
     };
   }
 }
@@ -48,7 +48,7 @@ export function parseQuestionnaireJsonText(text: string): QuestionnaireParseResu
   } catch (error) {
     return {
       ok: false,
-      errors: [`Файл не является корректным JSON: ${getErrorMessage(error)}`],
+      errors: [`Файл не является корректным файлом сценария: ${getErrorMessage(error)}`],
     };
   }
 

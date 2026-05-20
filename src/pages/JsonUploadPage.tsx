@@ -15,7 +15,7 @@ export function JsonUploadPage({ onQuestionnairesLoaded }: JsonUploadPageProps) 
 
   function loadQuestionnaires(questionnaires: Questionnaire[]) {
     if (questionnaires.length === 0) {
-      setErrors(["В JSON не найден ни один опросник."]);
+      setErrors(["В файле не найден ни один опросник."]);
       return;
     }
 
@@ -27,7 +27,7 @@ export function JsonUploadPage({ onQuestionnairesLoaded }: JsonUploadPageProps) 
     setErrors([]);
 
     if (!rawJson.trim()) {
-      setErrors(["Вставьте JSON опросника в поле или выберите JSON-файл."]);
+      setErrors(["Вставьте текст файла в поле или выберите файл сценария."]);
       return;
     }
 
@@ -48,14 +48,14 @@ export function JsonUploadPage({ onQuestionnairesLoaded }: JsonUploadPageProps) 
       const clipboardText = await navigator.clipboard.readText();
 
       if (!clipboardText.trim()) {
-        setErrors(["В буфере обмена нет текста с JSON."]);
+        setErrors(["В буфере обмена нет текста файла сценария."]);
         return;
       }
 
       setRawJson(clipboardText);
     } catch {
       setErrors([
-        "Браузер не дал доступ к буферу обмена. Кликните в поле ниже и нажмите Ctrl+V.",
+        "Страница не получила доступ к буферу обмена. Нажмите на поле ниже и используйте обычное сочетание клавиш для вставки.",
       ]);
     }
   }
@@ -82,15 +82,15 @@ export function JsonUploadPage({ onQuestionnairesLoaded }: JsonUploadPageProps) 
       <main className="upload-workspace">
         <div className="upload-card upload-main-card">
           <p className="page-kicker">Загрузка сценария</p>
-          <h1>Загрузите JSON опросника из 1С</h1>
+          <h1>Загрузите файл сценария из 1С</h1>
           <p>
-            Выберите файл выгрузки или вставьте JSON вручную. Интерфейс проверит структуру и откроет выбор
+            Выберите файл выгрузки или вставьте его текст вручную. Страница проверит структуру и откроет выбор
             опросника, если в файле несколько сценариев.
           </p>
 
           <div className="upload-actions-row">
             <label className="file-loader">
-              <span>Выбрать JSON-файл</span>
+              <span>Выбрать файл сценария</span>
               <input
                 type="file"
                 accept=".json,application/json"
@@ -103,13 +103,13 @@ export function JsonUploadPage({ onQuestionnairesLoaded }: JsonUploadPageProps) 
               className="secondary-button"
               onClick={handlePasteFromClipboard}
             >
-              Вставить из буфера
+              Вставить текст из буфера
             </button>
           </div>
 
           <div className="json-paste-panel">
             <div className="json-paste-header">
-              <label htmlFor="questionnaire-json">JSON опросника</label>
+              <label htmlFor="questionnaire-json">Текст файла сценария</label>
               <span>{rawJson.trim() ? `${rawJson.length} символов` : "Ожидаем файл или вставку"}</span>
             </div>
 
@@ -118,7 +118,7 @@ export function JsonUploadPage({ onQuestionnairesLoaded }: JsonUploadPageProps) 
               className="json-textarea"
               value={rawJson}
               onChange={(event) => setRawJson(event.target.value)}
-              placeholder='Кликните сюда и нажмите Ctrl+V, либо используйте кнопку "Вставить из буфера"'
+              placeholder='Нажмите сюда и вставьте текст файла, либо используйте кнопку "Вставить текст из буфера"'
               autoFocus
               spellCheck={false}
             />
@@ -126,7 +126,7 @@ export function JsonUploadPage({ onQuestionnairesLoaded }: JsonUploadPageProps) 
 
           {errors.length > 0 && (
             <div className="validation-error">
-              <strong>JSON не прошёл проверку:</strong>
+              <strong>Файл не прошёл проверку:</strong>
 
               <ul>
                 {errors.map((error) => (
@@ -144,11 +144,11 @@ export function JsonUploadPage({ onQuestionnairesLoaded }: JsonUploadPageProps) 
         <aside className="upload-side">
           <div className="upload-side-card">
             <p className="page-kicker">Что можно загрузить</p>
-            <h2>Форматы 1С</h2>
+            <h2>Файлы из 1С</h2>
             <ul className="upload-check-list">
-              <li>Один JSON-опросник</li>
-              <li>Bundle с несколькими опросниками</li>
-              <li>Вставка JSON из буфера обмена</li>
+              <li>Один опросник</li>
+              <li>Набор из нескольких опросников</li>
+              <li>Текст файла из буфера обмена</li>
             </ul>
           </div>
 
@@ -156,7 +156,7 @@ export function JsonUploadPage({ onQuestionnairesLoaded }: JsonUploadPageProps) 
             <p className="page-kicker">Перед запуском</p>
             <h2>Проверка</h2>
             <p>
-              Если структура повреждена, ошибки появятся здесь же. Рабочий сценарий сразу откроется в интерфейсе
+              Если структура повреждена, ошибки появятся здесь же. Рабочий сценарий сразу откроется на странице
               оператора.
             </p>
           </div>

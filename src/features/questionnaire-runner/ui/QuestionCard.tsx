@@ -163,7 +163,7 @@ export function QuestionCard({
       <div className="keyboard-hint">
         {isBooleanQuestion
           ? "Выберите Да или Нет — переход выполнится автоматически."
-          : "Enter — далее, Ctrl + Enter — далее из многострочного поля, Esc — назад."}
+          : "Ввод — далее, клавиша управления + Ввод — далее из многострочного поля, клавиша отмены — назад."}
       </div>
     </article>
   );
