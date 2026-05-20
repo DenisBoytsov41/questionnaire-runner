@@ -1451,6 +1451,56 @@ body {
   width: 100%;
 }
 
+.draft-status-card {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  background:
+    linear-gradient(135deg, rgba(0, 135, 127, 0.08), rgba(255, 255, 255, 0.96)),
+    #ffffff;
+}
+
+.draft-status-card strong {
+  display: block;
+  color: var(--ks-ink);
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.draft-status-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.draft-status-grid div {
+  min-width: 0;
+  border: 1px solid #dce8e6;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.76);
+  padding: 10px;
+}
+
+.draft-status-grid dt {
+  margin-bottom: 4px;
+  color: var(--ks-muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.draft-status-grid dd {
+  margin: 0;
+  color: var(--ks-ink);
+  font-weight: 850;
+}
+
+.draft-clear-button {
+  width: 100%;
+}
+
 .navigator-panel summary {
   grid-template-columns: auto 1fr;
   padding: 18px 20px;
@@ -2076,6 +2126,10 @@ select {
 
   .route-card-header {
     align-items: center;
+  }
+
+  .draft-status-grid {
+    grid-template-columns: 1fr;
   }
 
   .route-card-header strong {

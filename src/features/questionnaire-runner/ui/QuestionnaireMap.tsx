@@ -12,7 +12,11 @@ interface QuestionnaireMapProps {
   currentQuestionId: string;
   completedRoute: string[];
   totalQuestions: number;
+  answeredCount: number;
+  startedAt: string;
+  draftSavedAt: string;
   onBack: () => void;
+  onClearDraft: () => void;
   onNavigateToQuestion: (questionId: string) => void;
 }
 
@@ -21,7 +25,11 @@ export function QuestionnaireMap({
   currentQuestionId,
   completedRoute,
   totalQuestions,
+  answeredCount,
+  startedAt,
+  draftSavedAt,
   onBack,
+  onClearDraft,
   onNavigateToQuestion,
 }: QuestionnaireMapProps) {
   const completedQuestionIds = new Set(completedRoute);
@@ -55,6 +63,37 @@ export function QuestionnaireMap({
           onClick={onBack}
         >
           Назад к предыдущему вопросу
+        </button>
+      </section>
+
+      <section className="navigator-panel draft-status-card" aria-label="Состояние черновика">
+        <div>
+          <span className="panel-kicker">Состояние</span>
+          <strong>{draftSavedAt ? "Черновик сохранён" : "Новый опрос"}</strong>
+        </div>
+
+        <dl className="draft-status-grid">
+          <div>
+            <dt>Начало</dt>
+            <dd>{formatTime(startedAt)}</dd>
+          </div>
+          <div>
+            <dt>Сохранено</dt>
+            <dd>{draftSavedAt ? formatTime(draftSavedAt) : "пока нет"}</dd>
+          </div>
+          <div>
+            <dt>Ответов</dt>
+            <dd>{answeredCount}</dd>
+          </div>
+        </dl>
+
+        <button
+          type="button"
+          className="secondary-button draft-clear-button"
+          disabled={!draftSavedAt && answeredCount === 0}
+          onClick={onClearDraft}
+        >
+          Очистить и начать заново
         </button>
       </section>
 
@@ -108,6 +147,13 @@ export function QuestionnaireMap({
       </details>
     </div>
   );
+}
+
+function formatTime(value: string): string {
+  return new Intl.DateTimeFormat("ru-RU", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
 }
 
 interface QuestionGroup {
