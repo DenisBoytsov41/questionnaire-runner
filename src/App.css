@@ -3318,3 +3318,158 @@ html[data-theme="dark"] .view-settings-footer {
     width: 100%;
   }
 }
+
+/* Адаптив шапки и панели инструментов: вопрос остаётся главным на небольших экранах. */
+@media (max-width: 1180px) {
+  .runner-page {
+    order: 1;
+  }
+
+  .runner-side-panel {
+    order: 2;
+  }
+
+  .top-bar {
+    gap: 16px;
+  }
+
+  .top-bar .top-bar-actions {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+
+  .top-file-button {
+    flex: 1 1 210px;
+  }
+
+  .view-menu {
+    flex: 1 1 180px;
+  }
+
+  .view-menu-toggle {
+    width: 100%;
+  }
+
+  button.operator-profile {
+    flex: 0 0 auto;
+  }
+}
+
+@media (max-width: 980px) {
+  .top-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .top-bar .top-bar-main {
+    justify-content: flex-start;
+  }
+
+  .top-bar .top-bar-actions {
+    display: grid;
+    grid-template-columns: minmax(180px, 1.2fr) minmax(170px, 1fr) auto;
+    width: 100%;
+  }
+
+  .top-file-button,
+  .view-menu,
+  .view-menu-toggle {
+    width: 100%;
+  }
+
+  .operator-profile-text {
+    display: none;
+  }
+
+  button.operator-profile {
+    justify-content: center;
+    width: 56px;
+    min-width: 56px;
+    padding-inline: 8px;
+  }
+}
+
+@media (max-width: 760px) {
+  .top-bar .top-bar-main {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .workplace-title {
+    min-width: 0;
+    padding-left: 14px;
+    border-left: 1px solid #dce8e6;
+  }
+
+  .workplace-title span {
+    font-size: 11px;
+  }
+
+  .workplace-title strong {
+    font-size: 16px;
+    white-space: normal;
+  }
+
+  .top-bar .top-bar-actions {
+    grid-template-columns: 1fr 1fr 56px;
+    align-items: stretch;
+  }
+
+  .top-file-button,
+  .view-menu-toggle,
+  button.operator-profile {
+    min-height: 46px;
+  }
+
+  .view-menu-toggle span,
+  .top-file-button {
+    font-size: 13px;
+  }
+
+  .view-menu-toggle small {
+    display: none;
+  }
+
+  .top-bar .view-menu .view-settings {
+    position: static;
+    width: 100%;
+    margin-top: 8px;
+    border-radius: 14px;
+    box-shadow: none;
+  }
+
+  .top-bar .view-settings-buttons {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .top-bar .top-bar-main {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .workplace-title {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .top-bar .top-bar-actions {
+    grid-template-columns: 1fr;
+  }
+
+  button.operator-profile {
+    width: 100%;
+    justify-content: flex-start;
+    border-radius: 14px;
+  }
+
+  .operator-profile-text {
+    display: grid;
+  }
+
+  .runner-navigator {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+}
