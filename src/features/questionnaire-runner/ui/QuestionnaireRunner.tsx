@@ -1,4 +1,4 @@
-import { useMemo, useReducer } from "react";
+import { useEffect, useMemo, useReducer, useState } from "react";
 import {
   getMainFlowQuestions,
   getSectionById,
@@ -7,6 +7,13 @@ import type {
   Questionnaire,
   QuestionAnswer,
 } from "../../../entities/questionnaire/types";
+import {
+  clearRunnerDraft,
+  createRunnerStateFromDraft,
+  getRunnerDraftSavedAt,
+  hasDraftContent,
+  saveRunnerDraft,
+} from "../lib/draftStorage";
 import {
   createInitialRunnerState,
   runnerReducer,
@@ -20,10 +27,14 @@ interface QuestionnaireRunnerProps {
 }
 
 export function QuestionnaireRunner({ questionnaire }: QuestionnaireRunnerProps) {
+  const [restoredDraftSavedAt] = useState(() => getRunnerDraftSavedAt(questionnaire));
+  const [lastSavedAt, setLastSavedAt] = useState(restoredDraftSavedAt);
   const [state, dispatch] = useReducer(
     runnerReducer,
     questionnaire,
-    createInitialRunnerState,
+    (initialQuestionnaire) => (
+      createRunnerStateFromDraft(initialQuestionnaire) ?? createInitialRunnerState(initialQuestionnaire)
+    ),
   );
 
   const mainQuestions = useMemo(
@@ -36,6 +47,27 @@ export function QuestionnaireRunner({ questionnaire }: QuestionnaireRunnerProps)
     : mainQuestions.length;
   const isBranchQuestion = currentQuestionNumber <= 0;
 
+  useEffect(() => {
+    let timeoutId = 0;
+
+    if (!hasDraftContent(state)) {
+      clearRunnerDraft(questionnaire);
+      timeoutId = window.setTimeout(() => setLastSavedAt(""), 0);
+      return () => window.clearTimeout(timeoutId);
+    }
+
+    const savedAt = saveRunnerDraft(state);
+    timeoutId = window.setTimeout(() => setLastSavedAt(savedAt), 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [questionnaire, state]);
+
+  function handleRestart() {
+    clearRunnerDraft(questionnaire);
+    setLastSavedAt("");
+    dispatch({ type: "RESET" });
+  }
+
   if (state.isFinished || !state.currentQuestion) {
     return (
       <SummaryPage
@@ -46,7 +78,7 @@ export function QuestionnaireRunner({ questionnaire }: QuestionnaireRunnerProps)
         route={state.history}
         startedAt={state.startedAt}
         finishedAt={state.finishedAt}
-        onRestart={() => dispatch({ type: "RESET" })}
+        onRestart={handleRestart}
       />
     );
   }
@@ -66,7 +98,7 @@ export function QuestionnaireRunner({ questionnaire }: QuestionnaireRunnerProps)
     <div className="runner-layout">
       <main className="runner-page">
         <section className="runner-header" aria-labelledby="runner-title">
-          <p className="page-kicker">Интерактивный опросник</p>
+          <p className="page-kicker">Рабочий опросник</p>
           <h1 id="runner-title">{questionnaire.title}</h1>
           <p>{questionnaire.start_text}</p>
         </section>
@@ -99,7 +131,11 @@ export function QuestionnaireRunner({ questionnaire }: QuestionnaireRunnerProps)
           currentQuestionId={state.currentQuestion.id}
           completedRoute={state.history}
           totalQuestions={mainQuestions.length}
+          answeredCount={Object.keys(state.answers).length}
+          startedAt={state.startedAt}
+          draftSavedAt={lastSavedAt}
           onBack={() => dispatch({ type: "BACK" })}
+          onClearDraft={handleRestart}
           onNavigateToQuestion={(questionId) => {
             dispatch({
               type: "NAVIGATE_TO_ROUTE",
