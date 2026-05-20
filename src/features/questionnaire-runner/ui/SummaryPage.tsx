@@ -51,7 +51,14 @@ export function SummaryPage({
   });
   const groupedQuestions = groupQuestionsBySection(questionnaire, answeredQuestions);
   const applicationFields = getApplicationFields(questionnaire, answeredQuestions, answers);
-  const summaryText = buildSummaryText(questionnaire, groupedQuestions, answers, messages, verdicts);
+  const summaryText = buildSummaryText(
+    questionnaire,
+    applicationFields,
+    groupedQuestions,
+    answers,
+    messages,
+    verdicts,
+  );
 
   async function copySummary() {
     try {
@@ -133,6 +140,14 @@ export function SummaryPage({
               )}
             </div>
           )}
+
+          <div className="summary-copy-preview">
+            <div>
+              <p className="page-kicker">Текст для заявки</p>
+              <h2>Что будет скопировано</h2>
+            </div>
+            <pre>{summaryText}</pre>
+          </div>
 
           <div className="summary-list">
             <h2>Ответы по маршруту</h2>
@@ -251,26 +266,38 @@ function buildQuestionnaireResult({
 
 function buildSummaryText(
   questionnaire: Questionnaire,
+  applicationFields: ApplicationField[],
   groupedQuestions: SummaryQuestionGroup[],
   answers: AnswersMap,
   messages: string[],
   verdicts: string[],
 ): string {
-  const lines = [`Итог для заявки: ${questionnaire.title}`, ""];
+  const lines = [
+    `Итог обращения: ${questionnaire.title}`,
+    "",
+  ];
+
+  if (applicationFields.length > 0) {
+    lines.push("Данные для заявки:");
+    applicationFields.forEach((field) => {
+      lines.push(`${field.label}: ${field.value}`);
+    });
+    lines.push("");
+  }
 
   if (messages.length > 0) {
-    lines.push("Сообщения:");
+    lines.push("Что нужно учесть:");
     messages.forEach((message) => lines.push(`- ${message}`));
     lines.push("");
   }
 
   if (verdicts.length > 0) {
-    lines.push("Вердикты:");
+    lines.push("Итоговые действия:");
     verdicts.forEach((verdict) => lines.push(`- ${verdict}`));
     lines.push("");
   }
 
-  lines.push("Ответы по разделам:");
+  lines.push("Ответы по пройденному маршруту:");
   groupedQuestions.forEach((group) => {
     lines.push("");
     lines.push(group.sectionTitle);

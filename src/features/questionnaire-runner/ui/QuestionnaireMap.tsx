@@ -45,6 +45,10 @@ export function QuestionnaireMap({
     () => buildScenarioCheck(questionnaire, activeQuestions),
     [activeQuestions, questionnaire],
   );
+  const flowPreviewByQuestionId = useMemo(
+    () => buildFlowPreviewByQuestionId(questionnaire, activeQuestions),
+    [activeQuestions, questionnaire],
+  );
   const filteredGroups = useMemo(
     () => filterQuestionGroups(groupedQuestions, questionSearch),
     [groupedQuestions, questionSearch],
@@ -179,7 +183,7 @@ export function QuestionnaireMap({
                 const isCurrent = question.id === currentQuestionId;
                 const isCompleted = completedQuestionIds.has(question.id);
                 const isInRoute = routeQuestionIds.has(question.id);
-                const rules = question.rules ?? [];
+                const flowPreview = flowPreviewByQuestionId.get(question.id) ?? [];
 
                 return (
                   <article
@@ -199,11 +203,13 @@ export function QuestionnaireMap({
                       <strong>{question.title}</strong>
                     </button>
 
-                    {rules.length > 0 && (
+                    {flowPreview.length > 0 && (
                       <div className="question-rule-list">
-                        {rules.map((rule) => (
-                          <small key={`${question.id}-${rule.value}-${rule.action}`}>
-                            {formatRuleValue(rule.value)} {"->"} {formatRuleTarget(questionnaire, rule.question_id, rule.action)}
+                        {flowPreview.map((rule) => (
+                          <small key={`${question.id}-${rule.condition}-${rule.target}`}>
+                            <span>{rule.condition}</span>
+                            <strong>{rule.target}</strong>
+                            {rule.note && <em>{rule.note}</em>}
                           </small>
                         ))}
                       </div>
@@ -236,6 +242,12 @@ interface ScenarioCheck {
   ruleCount: number;
   branchCount: number;
   warnings: string[];
+}
+
+interface FlowPreviewItem {
+  condition: string;
+  target: string;
+  note: string;
 }
 
 function groupQuestionsBySection(
@@ -285,6 +297,48 @@ function countQuestions(groups: QuestionGroup[]): number {
   return groups.reduce((sum, group) => sum + group.questions.length, 0);
 }
 
+function buildFlowPreviewByQuestionId(
+  questionnaire: Questionnaire,
+  activeQuestions: QuestionnaireQuestion[],
+): Map<string, FlowPreviewItem[]> {
+  const result = new Map<string, FlowPreviewItem[]>();
+  const activeQuestionIds = new Set(activeQuestions.map((question) => question.id));
+  const nextQuestionById = getNextQuestionById(activeQuestions);
+
+  activeQuestions.forEach((question) => {
+    const rules = question.rules ?? [];
+    const previewItems = rules.map((rule) => ({
+      condition: formatRuleValue(rule.value),
+      target: formatRuleTarget(questionnaire, rule.question_id, rule.action),
+      note: formatRuleNote(rule.message, rule.verdict),
+    }));
+
+    if (rules.length === 0) {
+      previewItems.push({
+        condition: "Любой ответ",
+        target: nextQuestionById.get(question.id)
+          ? formatRuleTarget(questionnaire, nextQuestionById.get(question.id) ?? null, "go_to_question")
+          : "завершить",
+        note: "обычный порядок",
+      });
+    } else {
+      const hasNextRule = rules.some((rule) => rule.action === "next");
+
+      if (!hasNextRule && nextQuestionById.get(question.id) && activeQuestionIds.has(nextQuestionById.get(question.id) ?? "")) {
+        previewItems.push({
+          condition: "Если нет отдельного правила",
+          target: formatRuleTarget(questionnaire, nextQuestionById.get(question.id) ?? null, "go_to_question"),
+          note: "обычный порядок",
+        });
+      }
+    }
+
+    result.set(question.id, previewItems);
+  });
+
+  return result;
+}
+
 function buildScenarioCheck(
   questionnaire: Questionnaire,
   activeQuestions: QuestionnaireQuestion[],
@@ -332,15 +386,7 @@ function getUnreachableQuestions(activeQuestions: QuestionnaireQuestion[]): Ques
   }
 
   const questionsById = new Map(activeQuestions.map((question) => [question.id, question]));
-  const nextQuestionById = new Map<string, string>();
-
-  activeQuestions.forEach((question, index) => {
-    const nextQuestion = activeQuestions[index + 1];
-
-    if (nextQuestion) {
-      nextQuestionById.set(question.id, nextQuestion.id);
-    }
-  });
+  const nextQuestionById = getNextQuestionById(activeQuestions);
 
   const reachableIds = new Set<string>();
   const queue = [firstQuestion.id];
@@ -376,6 +422,20 @@ function getUnreachableQuestions(activeQuestions: QuestionnaireQuestion[]): Ques
   return activeQuestions.filter((question) => !reachableIds.has(question.id));
 }
 
+function getNextQuestionById(activeQuestions: QuestionnaireQuestion[]): Map<string, string> {
+  const nextQuestionById = new Map<string, string>();
+
+  activeQuestions.forEach((question, index) => {
+    const nextQuestion = activeQuestions[index + 1];
+
+    if (nextQuestion) {
+      nextQuestionById.set(question.id, nextQuestion.id);
+    }
+  });
+
+  return nextQuestionById;
+}
+
 function formatRuleValue(value: string | boolean | number | null): string {
   if (value === true || value === "true") {
     return "Да";
@@ -406,4 +466,10 @@ function formatRuleTarget(
     : null;
 
   return question?.title ?? questionId ?? "не задан";
+}
+
+function formatRuleNote(message: string | undefined, verdict: string | undefined): string {
+  const notes = [message, verdict].filter((item): item is string => Boolean(item?.trim()));
+
+  return notes.join("; ");
 }
