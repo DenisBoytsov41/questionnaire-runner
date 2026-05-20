@@ -3473,3 +3473,57 @@ html[data-theme="dark"] .view-settings-footer {
     grid-template-columns: 1fr;
   }
 }
+
+/* Схема вопросов на небольших экранах: без зажатого окна и пустых соседних карточек. */
+@media (max-width: 1180px) {
+  .runner-navigator {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .map-card {
+    grid-column: 1 / -1;
+  }
+
+  .scenario-check-card {
+    min-height: 0;
+  }
+
+  .question-map {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .map-card[open] .question-map {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .map-card[open] .question-map-section h3 {
+    position: static;
+  }
+}
+
+@media (max-width: 900px) {
+  .runner-navigator {
+    grid-template-columns: 1fr;
+  }
+
+  .map-card[open] .question-map {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .question-map-tools {
+    padding-inline: 14px;
+  }
+
+  .question-map {
+    padding-inline: 14px;
+  }
+
+  .question-rule-list small {
+    overflow-wrap: anywhere;
+  }
+}
