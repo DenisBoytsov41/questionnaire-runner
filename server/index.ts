@@ -19,6 +19,12 @@ import {
   sendJson,
 } from "./lib/http.js";
 import { readStorage, updateStorage } from "./lib/storage.js";
+import {
+  isSwaggerAuthorized,
+  sendOpenApiDocument,
+  sendSwaggerUi,
+  sendSwaggerUnauthorized,
+} from "./lib/swagger.js";
 
 const port = Number(process.env.PORT ?? 4100);
 const jwtSecret = process.env.JWT_SECRET ?? "dev-secret-change-me";
@@ -67,6 +73,23 @@ const server = createServer(async (req, res) => {
   try {
     const context = await createContext(req, res, jwtSecret);
     const parts = getPathParts(context.url);
+
+    if (parts[0] === "api" && parts[1] === "docs") {
+      if (!isSwaggerAuthorized(req)) {
+        sendSwaggerUnauthorized(res);
+        return;
+      }
+
+      if (req.method === "GET" && !parts[2]) {
+        sendSwaggerUi(res);
+        return;
+      }
+
+      if (req.method === "GET" && parts[2] === "openapi.json") {
+        sendOpenApiDocument(res);
+        return;
+      }
+    }
 
     if (parts[0] !== "api") {
       sendJson(res, 404, { error: "Маршрут не найден." });

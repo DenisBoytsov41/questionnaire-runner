@@ -71,6 +71,16 @@ export function sendJson(res: ServerResponse, status: number, payload: unknown):
   res.end(JSON.stringify(payload));
 }
 
+export function sendHtml(res: ServerResponse, status: number, html: string): void {
+  res.writeHead(status, {
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Allow-Methods": "GET, POST, PATCH, OPTIONS",
+    "Access-Control-Allow-Origin": process.env.CORS_ORIGIN ?? "*",
+    "Content-Type": "text/html; charset=utf-8",
+  });
+  res.end(html);
+}
+
 export function sendError(res: ServerResponse, error: unknown): void {
   if (error instanceof HttpError) {
     sendJson(res, error.status, {

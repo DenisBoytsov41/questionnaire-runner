@@ -9,11 +9,11 @@ npm run dev
 npm run build
 ```
 
-Frontend работает как автономный runner: можно загрузить файл сценария из 1С, пройти опросник, скопировать итог и скачать файл результата.
+Frontend работает как автономный интерфейс оператора: можно загрузить файл сценария из 1С, пройти опросник, скопировать итог и скачать файл результата.
 
 ## Backend
 
-Первый backend лежит в папке `server`. Сейчас он использует файловое хранилище `server/data/storage.json`, чтобы быстро проверить модель без установки базы данных. Файл хранилища не коммитится.
+Backend находится в папке `server`. Сейчас он использует файловое хранилище `server/data/storage.json`, чтобы быстро проверить модель без установки базы данных. Файл хранилища не коммитится.
 
 ```powershell
 npm run build:server
@@ -29,14 +29,35 @@ npm run dev:server
 Пароль: admin123
 ```
 
-Для локальной разработки можно переопределить:
+Для локальной разработки можно переопределить переменные окружения:
 
 ```powershell
 $env:ADMIN_LOGIN="admin"
 $env:ADMIN_PASSWORD="strong-password"
 $env:JWT_SECRET="local-secret"
+$env:SWAGGER_USER="docs"
+$env:SWAGGER_PASSWORD="docs-password"
 npm run dev:server
 ```
+
+Пример файла окружения лежит в [.env.example](.env.example).
+
+## Документация API
+
+Закрытая документация доступна после запуска backend:
+
+```text
+http://localhost:4100/api/docs
+```
+
+Доступ защищён отдельным логином и паролем из переменных:
+
+```text
+SWAGGER_USER
+SWAGGER_PASSWORD
+```
+
+По умолчанию для разработки используются `admin` / `admin123`, но для нормального окружения их нужно заменить.
 
 ## Роли
 
@@ -65,6 +86,10 @@ PATCH /api/questionnaire-runs/:id/draft
 POST  /api/questionnaire-runs/:id/finish
 GET   /api/questionnaire-runs
 ```
+
+## База данных
+
+Простая схема будущей БД описана в [docs/database-design.md](docs/database-design.md). Ближайший вариант - PostgreSQL: пользователи, опросники, версии JSON из 1С, прохождения и журнал важных действий.
 
 ## Быстрая проверка backend
 
