@@ -79,26 +79,24 @@ export function JsonUploadPage({ onQuestionnairesLoaded }: JsonUploadPageProps) 
 
   return (
     <section className="upload-page">
-      <div className="upload-card">
-        <p className="page-kicker">Загрузка сценария</p>
-        <h1>Загрузите JSON опросника из 1С</h1>
-        <p>
-          Можно выбрать один JSON-опросник, bundle-файл с несколькими
-          опросниками или вставить содержимое JSON вручную.
-        </p>
+      <main className="upload-workspace">
+        <div className="upload-card upload-main-card">
+          <p className="page-kicker">Загрузка сценария</p>
+          <h1>Загрузите JSON опросника из 1С</h1>
+          <p>
+            Выберите файл выгрузки или вставьте JSON вручную. Интерфейс проверит структуру и откроет выбор
+            опросника, если в файле несколько сценариев.
+          </p>
 
-        <label className="file-loader">
-          <span>Выбрать JSON-файл</span>
-          <input
-            type="file"
-            accept=".json,application/json"
-            onChange={(event) => handleFileChange(event.target.files?.[0] ?? null)}
-          />
-        </label>
-
-        <div className="json-paste-panel">
-          <div className="json-paste-header">
-            <label htmlFor="questionnaire-json">JSON опросника</label>
+          <div className="upload-actions-row">
+            <label className="file-loader">
+              <span>Выбрать JSON-файл</span>
+              <input
+                type="file"
+                accept=".json,application/json"
+                onChange={(event) => handleFileChange(event.target.files?.[0] ?? null)}
+              />
+            </label>
 
             <button
               type="button"
@@ -109,33 +107,61 @@ export function JsonUploadPage({ onQuestionnairesLoaded }: JsonUploadPageProps) 
             </button>
           </div>
 
-          <textarea
-            id="questionnaire-json"
-            className="json-textarea"
-            value={rawJson}
-            onChange={(event) => setRawJson(event.target.value)}
-            placeholder='Кликните сюда и нажмите Ctrl+V, либо используйте кнопку "Вставить из буфера"'
-            autoFocus
-            spellCheck={false}
-          />
+          <div className="json-paste-panel">
+            <div className="json-paste-header">
+              <label htmlFor="questionnaire-json">JSON опросника</label>
+              <span>{rawJson.trim() ? `${rawJson.length} символов` : "Ожидаем файл или вставку"}</span>
+            </div>
+
+            <textarea
+              id="questionnaire-json"
+              className="json-textarea"
+              value={rawJson}
+              onChange={(event) => setRawJson(event.target.value)}
+              placeholder='Кликните сюда и нажмите Ctrl+V, либо используйте кнопку "Вставить из буфера"'
+              autoFocus
+              spellCheck={false}
+            />
+          </div>
+
+          {errors.length > 0 && (
+            <div className="validation-error">
+              <strong>JSON не прошёл проверку:</strong>
+
+              <ul>
+                {errors.map((error) => (
+                  <li key={error}>{error}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <button type="button" className="primary-button upload-submit-button" onClick={handleLoadFromText}>
+            Загрузить из текста
+          </button>
         </div>
 
-        {errors.length > 0 && (
-          <div className="validation-error">
-            <strong>JSON не прошёл проверку:</strong>
-
-            <ul>
-              {errors.map((error) => (
-                <li key={error}>{error}</li>
-              ))}
+        <aside className="upload-side">
+          <div className="upload-side-card">
+            <p className="page-kicker">Что можно загрузить</p>
+            <h2>Форматы 1С</h2>
+            <ul className="upload-check-list">
+              <li>Один JSON-опросник</li>
+              <li>Bundle с несколькими опросниками</li>
+              <li>Вставка JSON из буфера обмена</li>
             </ul>
           </div>
-        )}
 
-        <button type="button" className="primary-button" onClick={handleLoadFromText}>
-          Загрузить из текста
-        </button>
-      </div>
+          <div className="upload-side-card">
+            <p className="page-kicker">Перед запуском</p>
+            <h2>Проверка</h2>
+            <p>
+              Если структура повреждена, ошибки появятся здесь же. Рабочий сценарий сразу откроется в интерфейсе
+              оператора.
+            </p>
+          </div>
+        </aside>
+      </main>
     </section>
   );
 }
