@@ -44,6 +44,8 @@ const visionOptions: Array<{ value: VisionMode; label: string }> = [
 
 export function BrandHeader({ subtitle, action }: BrandHeaderProps) {
   const [settings, setSettings] = useState<UiSettings>(readSettings);
+  const activeTextScale = textScaleOptions.find((option) => option.value === settings.textScale);
+  const activeTheme = themeOptions.find((option) => option.value === settings.theme);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -77,30 +79,51 @@ export function BrandHeader({ subtitle, action }: BrandHeaderProps) {
       </div>
 
       <div className="top-bar-actions">
-        <div className="view-settings" aria-label="Настройки внешнего вида">
-          <div className="view-settings-title">Вид</div>
-
-          <SettingButtons
-            label="Размер текста"
-            options={textScaleOptions}
-            value={settings.textScale}
-            onChange={(textScale) => updateSettings({ textScale })}
-          />
-
-          <SettingButtons
-            label="Оформление"
-            options={themeOptions}
-            value={settings.theme}
-            onChange={(theme) => updateSettings({ theme })}
-          />
-
-          <SettingButtons
-            label="Чтение"
-            options={visionOptions}
-            value={settings.visionMode}
-            onChange={(visionMode) => updateSettings({ visionMode })}
-          />
+        <div className="operator-profile" aria-label="Профиль оператора">
+          <span className="operator-avatar">ОП</span>
+          <div>
+            <strong>Оператор первой линии</strong>
+            <span>Вход будет подключён позже</span>
+          </div>
         </div>
+
+        <details className="view-menu">
+          <summary>
+            <span>Настройки вида</span>
+            <small>
+              {activeTextScale?.label}, {activeTheme?.label.toLowerCase()}
+              {settings.visionMode === "easy" ? ", читаемость" : ""}
+            </small>
+          </summary>
+
+          <div className="view-settings" aria-label="Настройки внешнего вида">
+            <SettingButtons
+              label="Размер текста"
+              options={textScaleOptions}
+              value={settings.textScale}
+              onChange={(textScale) => updateSettings({ textScale })}
+            />
+
+            <SettingButtons
+              label="Оформление"
+              options={themeOptions}
+              value={settings.theme}
+              onChange={(theme) => updateSettings({ theme })}
+            />
+
+            <SettingButtons
+              label="Чтение"
+              options={visionOptions}
+              value={settings.visionMode}
+              onChange={(visionMode) => updateSettings({ visionMode })}
+            />
+
+            <p className="view-settings-note">
+              Эти параметры сохраняются только в этом браузере. После подключения входа их можно будет хранить в
+              профиле сотрудника.
+            </p>
+          </div>
+        </details>
 
         {action && (
           <button type="button" className="secondary-button" onClick={action.onClick}>
