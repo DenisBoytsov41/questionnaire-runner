@@ -9,8 +9,10 @@ lerna-debug.log*
 
 node_modules
 dist
+dist-server
 dist-ssr
 *.local
+server/data/*.json
 
 # Editor directories and files
 .vscode/*
@@ -26,8 +28,10 @@ dist-ssr
 
 node_modules
 dist
+dist-server
 dist-ssr
 *.local
+server/data/*.json
 
 .vscode/*
 !.vscode/extensions.json
