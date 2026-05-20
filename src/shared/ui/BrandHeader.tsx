@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface BrandHeaderProps {
   subtitle: string;
@@ -44,6 +44,8 @@ const visionOptions: Array<{ value: VisionMode; label: string }> = [
 
 export function BrandHeader({ subtitle, action }: BrandHeaderProps) {
   const [settings, setSettings] = useState<UiSettings>(readSettings);
+  const [isViewMenuOpen, setIsViewMenuOpen] = useState(false);
+  const viewMenuRef = useRef<HTMLDivElement | null>(null);
   const activeTextScale = textScaleOptions.find((option) => option.value === settings.textScale);
   const activeTheme = themeOptions.find((option) => option.value === settings.theme);
 
@@ -61,75 +63,129 @@ export function BrandHeader({ subtitle, action }: BrandHeaderProps) {
     }
   }, [settings]);
 
+  useEffect(() => {
+    if (!isViewMenuOpen) {
+      return;
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as Node | null;
+
+      if (target && viewMenuRef.current?.contains(target)) {
+        return;
+      }
+
+      setIsViewMenuOpen(false);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsViewMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isViewMenuOpen]);
+
   const updateSettings = (nextSettings: Partial<UiSettings>) => {
     setSettings((currentSettings) => ({ ...currentSettings, ...nextSettings }));
   };
 
+  const resetSettings = () => {
+    setSettings(defaultSettings);
+  };
+
   return (
     <div className="top-bar">
-      <div className="brand-lockup">
-        <span className="brand-logo-mark">
-          <img src="/ks-logo-full.png" alt="К-Сервис" className="brand-logo" />
-        </span>
+      <div className="top-bar-main">
+        <div className="brand-lockup">
+          <span className="brand-logo-mark">
+            <img src="/ks-logo-full.png" alt="К-Сервис" className="brand-logo" />
+          </span>
 
-        <div>
-          <strong>К-Сервис</strong>
-          <span>{subtitle}</span>
+          <div>
+            <strong>К-Сервис</strong>
+            <span>{subtitle}</span>
+          </div>
+        </div>
+
+        <div className="workplace-title">
+          <span>Рабочее место</span>
+          <strong>Опросник первой линии</strong>
         </div>
       </div>
 
       <div className="top-bar-actions">
-        <div className="operator-profile" aria-label="Профиль оператора">
-          <span className="operator-avatar">ОП</span>
-          <div>
-            <strong>Оператор первой линии</strong>
-            <span>Вход будет подключён позже</span>
-          </div>
-        </div>
+        {action && (
+          <button type="button" className="secondary-button top-file-button" onClick={action.onClick}>
+            {action.label}
+          </button>
+        )}
 
-        <details className="view-menu">
-          <summary>
+        <div className="view-menu" ref={viewMenuRef}>
+          <button
+            type="button"
+            className="view-menu-toggle"
+            aria-expanded={isViewMenuOpen}
+            onClick={() => setIsViewMenuOpen((isOpen) => !isOpen)}
+          >
             <span>Настройки вида</span>
             <small>
               {activeTextScale?.label}, {activeTheme?.label.toLowerCase()}
               {settings.visionMode === "easy" ? ", читаемость" : ""}
             </small>
-          </summary>
-
-          <div className="view-settings" aria-label="Настройки внешнего вида">
-            <SettingButtons
-              label="Размер текста"
-              options={textScaleOptions}
-              value={settings.textScale}
-              onChange={(textScale) => updateSettings({ textScale })}
-            />
-
-            <SettingButtons
-              label="Оформление"
-              options={themeOptions}
-              value={settings.theme}
-              onChange={(theme) => updateSettings({ theme })}
-            />
-
-            <SettingButtons
-              label="Чтение"
-              options={visionOptions}
-              value={settings.visionMode}
-              onChange={(visionMode) => updateSettings({ visionMode })}
-            />
-
-            <p className="view-settings-note">
-              Эти параметры сохраняются только в этом браузере. После подключения входа их можно будет хранить в
-              профиле сотрудника.
-            </p>
-          </div>
-        </details>
-
-        {action && (
-          <button type="button" className="secondary-button" onClick={action.onClick}>
-            {action.label}
           </button>
-        )}
+
+          {isViewMenuOpen && (
+            <div className="view-settings" aria-label="Настройки внешнего вида">
+              <SettingButtons
+                label="Размер текста"
+                options={textScaleOptions}
+                value={settings.textScale}
+                onChange={(textScale) => updateSettings({ textScale })}
+              />
+
+              <SettingButtons
+                label="Оформление"
+                options={themeOptions}
+                value={settings.theme}
+                onChange={(theme) => updateSettings({ theme })}
+              />
+
+              <SettingButtons
+                label="Чтение"
+                options={visionOptions}
+                value={settings.visionMode}
+                onChange={(visionMode) => updateSettings({ visionMode })}
+              />
+
+              <div className="view-settings-footer">
+                <p>
+                  Пока настройки сохраняются только в этом браузере. После подключения входа перенесём их в профиль
+                  сотрудника.
+                </p>
+
+                <button type="button" className="secondary-button view-reset-button" onClick={resetSettings}>
+                  Сбросить настройки вида
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <button type="button" className="operator-profile" aria-label="Профиль оператора">
+          <span className="operator-avatar">ОП</span>
+          <span className="operator-profile-text">
+            <strong>Оператор</strong>
+            <small>Вход позже</small>
+          </span>
+        </button>
       </div>
     </div>
   );
