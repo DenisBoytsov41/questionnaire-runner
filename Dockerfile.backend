@@ -1,0 +1,26 @@
+FROM node:24-alpine AS build
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci
+
+COPY tsconfig.server.json ./
+COPY server ./server
+COPY db ./db
+RUN npm run build:server
+
+FROM node:24-alpine AS runtime
+
+WORKDIR /app
+ENV NODE_ENV=production
+
+COPY package*.json ./
+RUN npm ci --omit=dev
+
+COPY --from=build /app/dist-server ./dist-server
+COPY --from=build /app/db ./db
+
+EXPOSE 4100
+
+CMD ["sh", "-c", "node dist-server/server/db/migrate.js && node dist-server/server/index.js"]

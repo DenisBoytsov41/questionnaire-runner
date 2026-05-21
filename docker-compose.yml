@@ -1,0 +1,53 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: questionnaire-frontend
+    ports:
+      - "${FRONTEND_PORT:-5173}:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: questionnaire-backend
+    ports:
+      - "${BACKEND_PORT:-4100}:4100"
+    environment:
+      PORT: 4100
+      CORS_ORIGIN: "${CORS_ORIGIN:-http://localhost:5173}"
+      JWT_SECRET: "${JWT_SECRET:-change-me-use-long-random-value}"
+      ADMIN_LOGIN: "${ADMIN_LOGIN:-admin}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-admin123}"
+      SWAGGER_USER: "${SWAGGER_USER:-docs}"
+      SWAGGER_PASSWORD: "${SWAGGER_PASSWORD:-docs-password}"
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-questionnaire}:${POSTGRES_PASSWORD:-questionnaire_password}@db:5432/${POSTGRES_DB:-questionnaire_runner}"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:18-alpine
+    container_name: questionnaire-db
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB:-questionnaire_runner}"
+      POSTGRES_USER: "${POSTGRES_USER:-questionnaire}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-questionnaire_password}"
+    volumes:
+      - questionnaire-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-questionnaire} -d ${POSTGRES_DB:-questionnaire_runner}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  questionnaire-db-data:

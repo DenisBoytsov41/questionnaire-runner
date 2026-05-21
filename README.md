@@ -1,8 +1,8 @@
 # Questionnaire Runner
 
-Web-интерфейс для прохождения сценариев первой линии и первый backend для хранения сценариев, пользователей и результатов.
+Web-интерфейс для прохождения сценариев первой линии и backend для хранения сценариев, пользователей и результатов.
 
-## Frontend
+## Быстрый запуск frontend
 
 ```powershell
 npm run dev
@@ -11,7 +11,7 @@ npm run build
 
 Frontend работает как автономный интерфейс оператора: можно загрузить файл сценария из 1С, пройти опросник, скопировать итог и скачать файл результата.
 
-## Backend
+## Быстрый запуск backend
 
 Backend находится в папке `server`. Сейчас он использует файловое хранилище `server/data/storage.json`, чтобы быстро проверить модель без установки базы данных. Файл хранилища не коммитится.
 
@@ -29,7 +29,38 @@ npm run dev:server
 Пароль: admin123
 ```
 
-Для локальной разработки можно переопределить переменные окружения:
+## Запуск в Docker
+
+Проект подготовлен к запуску в трёх контейнерах:
+
+```text
+frontend  - web-интерфейс
+backend   - API
+db        - PostgreSQL
+```
+
+Запуск:
+
+```powershell
+docker compose up --build
+```
+
+После запуска:
+
+```text
+Frontend: http://localhost:5173
+Backend:  http://localhost:4100
+Документация API: http://localhost:4100/api/docs
+PostgreSQL: localhost:5432
+```
+
+Backend ждёт готовности PostgreSQL, применяет миграции из `db/migrations` и затем запускает API.
+
+## Переменные окружения
+
+Пример файла окружения лежит в [.env.example](.env.example).
+
+Для локальной разработки можно переопределить:
 
 ```powershell
 $env:ADMIN_LOGIN="admin"
@@ -40,7 +71,19 @@ $env:SWAGGER_PASSWORD="docs-password"
 npm run dev:server
 ```
 
-Пример файла окружения лежит в [.env.example](.env.example).
+## Миграции базы данных
+
+Миграции лежат в папке `db/migrations`.
+
+Локальный запуск миграций:
+
+```powershell
+npm run build:server
+$env:DATABASE_URL="postgresql://questionnaire:change-me@localhost:5432/questionnaire_runner"
+npm run migrate
+```
+
+Схема будущей базы описана в [docs/database-design.md](docs/database-design.md).
 
 ## Документация API
 
@@ -86,10 +129,6 @@ PATCH /api/questionnaire-runs/:id/draft
 POST  /api/questionnaire-runs/:id/finish
 GET   /api/questionnaire-runs
 ```
-
-## База данных
-
-Простая схема будущей БД описана в [docs/database-design.md](docs/database-design.md). Ближайший вариант - PostgreSQL: пользователи, опросники, версии JSON из 1С, прохождения и журнал важных действий.
 
 ## Быстрая проверка backend
 
