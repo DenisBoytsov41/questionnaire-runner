@@ -5,11 +5,23 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:server": "node dist-server/server/index.js",
     "build": "tsc -b && vite build",
+    "build:server": "tsc -p tsconfig.server.json",
+    "db:generate": "prisma generate",
+    "db:migration:create": "prisma migrate dev --create-only",
+    "db:migrate": "prisma migrate deploy",
+    "db:studio": "prisma studio",
+    "docker:logs": "powershell -ExecutionPolicy Bypass -File scripts/docker-logs.ps1",
     "lint": "eslint .",
+    "migrate": "node dist-server/server/db/prisma-migrate.js",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@prisma/client": "^7.8.0",
+    "dotenv": "^17.4.2",
+    "pg": "^8.21.0",
+    "prisma": "^7.8.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "zod": "^4.4.3"
@@ -17,6 +29,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^24.12.3",
+    "@types/pg": "^8.20.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",

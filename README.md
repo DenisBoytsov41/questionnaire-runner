@@ -1,73 +1,183 @@
-# React + TypeScript + Vite
+# Questionnaire Runner
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Web-интерфейс для прохождения сценариев первой линии и backend для хранения сценариев, пользователей и результатов.
 
-Currently, two official plugins are available:
+## Быстрый запуск frontend
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```powershell
+npm run dev
+npm run build
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Frontend работает как автономный интерфейс оператора: можно загрузить файл сценария из 1С, пройти опросник, скопировать итог и скачать файл результата.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Быстрый запуск backend
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Backend находится в папке `server` и работает с PostgreSQL через переменную `DATABASE_URL`.
+
+```powershell
+npm run build:server
+$env:DATABASE_URL="postgresql://questionnaire:change-me@localhost:5432/questionnaire_runner"
+npm run migrate
+npm run dev:server
+```
+
+По умолчанию сервер запускается на `http://localhost:4100`.
+
+Если в таблице пользователей ещё нет записей, автоматически создаётся администратор:
+
+```text
+Логин: admin
+Пароль: admin123
+```
+
+## Запуск в Docker
+
+Проект подготовлен к запуску в четырёх контейнерах:
+
+```text
+frontend  - web-интерфейс
+backend   - API
+db        - PostgreSQL
+pgadmin   - web-интерфейс управления PostgreSQL
+```
+
+Запуск:
+
+```powershell
+docker compose up --build
+```
+
+После запуска:
+
+```text
+Frontend: http://localhost:5173
+Backend:  http://localhost:4100
+Проверка backend: http://localhost:4100/api/health
+Документация API: http://localhost:4100/api/docs
+PostgreSQL: localhost:5432
+pgAdmin:  http://localhost:5050
+```
+
+Backend ждёт готовности PostgreSQL, применяет Prisma-миграции из `prisma/migrations` и затем запускает API.
+
+В pgAdmin заранее добавлен сервер `Questionnaire PostgreSQL`. После входа на `http://localhost:5050` откройте `Servers -> Questionnaire PostgreSQL -> Databases -> questionnaire_runner`; если pgAdmin попросит пароль, используйте `POSTGRES_PASSWORD` из `.env`.
+
+Подробная инструкция по Docker-командам лежит в [docs/docker-commands.md](docs/docker-commands.md).
+
+Красивый просмотр логов всех контейнеров:
+
+```powershell
+npm run docker:logs
+```
+
+## Переменные окружения
+
+Пример файла окружения лежит в [.env.example](.env.example).
+
+Для локальной разработки можно переопределить:
+
+```powershell
+$env:ADMIN_LOGIN="admin"
+$env:ADMIN_PASSWORD="strong-password"
+$env:JWT_SECRET="local-secret"
+$env:SWAGGER_USER="docs"
+$env:SWAGGER_PASSWORD="docs-password"
+npm run dev:server
+```
+
+## Миграции базы данных
+
+Схема базы описана в [prisma/schema.prisma](prisma/schema.prisma). Новые изменения структуры делаем через Prisma: меняем схему, создаём файл миграции, проверяем его и применяем.
+
+Локальный запуск миграций:
+
+```powershell
+npm run build:server
+$env:DATABASE_URL="postgresql://questionnaire:change-me@localhost:5432/questionnaire_runner"
+npm run migrate
+```
+
+Создать новую миграцию после изменения `prisma/schema.prisma`:
+
+```powershell
+npm run db:migration:create -- --name add_short_description
+```
+
+Посмотреть базу через Prisma Studio:
+
+```powershell
+npm run db:studio
+```
+
+Подробная инструкция по миграциям лежит в [docs/database-migrations.md](docs/database-migrations.md). Схема базы описана в [docs/database-design.md](docs/database-design.md).
+
+## Документация API
+
+Закрытая документация доступна после запуска backend:
+
+```text
+http://localhost:4100/api/docs
+```
+
+Доступ защищён отдельным логином и паролем из переменных:
+
+```text
+SWAGGER_USER
+SWAGGER_PASSWORD
+```
+
+По умолчанию для разработки используются `admin` / `admin123`, но для нормального окружения их нужно заменить.
+
+## Роли
+
+```text
+user      - созданный пользователь без доступа к рабочим сценариям;
+operator  - оператор, может проходить опубликованные опросники;
+admin     - администратор, может импортировать сценарии, управлять пользователями и видеть все результаты.
+```
+
+## Основные маршруты backend
+
+```text
+POST /api/auth/register
+POST /api/auth/login
+GET  /api/me
+PATCH /api/me/profile
+
+GET   /api/users
+PATCH /api/users/:id
+
+GET  /api/questionnaires
+GET  /api/questionnaires/:id
+POST /api/admin/questionnaires/import
+POST /api/admin/questionnaires/:id/publish
+
+POST  /api/questionnaire-runs
+GET   /api/questionnaire-runs
+GET   /api/questionnaire-runs/:id
+PATCH /api/questionnaire-runs/:id/draft
+POST  /api/questionnaire-runs/:id/finish
+```
+
+## Быстрая проверка backend
+
+```powershell
+$login = Invoke-RestMethod -Method Post `
+  -Uri http://localhost:4100/api/auth/login `
+  -ContentType 'application/json' `
+  -Body '{"login":"admin","password":"admin123"}'
+
+$token = $login.token
+$json = Get-Content -Path 'public/questionnaires/Чек-лист звонка по ККТ.json' -Raw -Encoding utf8
+
+Invoke-RestMethod -Method Post `
+  -Uri http://localhost:4100/api/admin/questionnaires/import `
+  -ContentType 'application/json' `
+  -Headers @{ Authorization = "Bearer $token" } `
+  -Body $json
+
+Invoke-RestMethod -Method Get `
+  -Uri http://localhost:4100/api/questionnaires `
+  -Headers @{ Authorization = "Bearer $token" }
 ```
