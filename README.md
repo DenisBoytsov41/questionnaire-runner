@@ -39,6 +39,7 @@ npm run dev:server
 frontend  - web-интерфейс
 backend   - API
 db        - PostgreSQL
+pgadmin   - web-интерфейс управления PostgreSQL
 ```
 
 Запуск:
@@ -55,6 +56,7 @@ Backend:  http://localhost:4100
 Проверка backend: http://localhost:4100/api/health
 Документация API: http://localhost:4100/api/docs
 PostgreSQL: localhost:5432
+pgAdmin:  http://localhost:5050
 ```
 
 Backend ждёт готовности PostgreSQL, применяет миграции из `db/migrations` и затем запускает API.

@@ -6,6 +6,7 @@
 frontend  - web-интерфейс оператора
 backend   - сервер API
 db        - PostgreSQL
+pgadmin   - web-интерфейс управления PostgreSQL
 ```
 
 ## Первый запуск
@@ -23,6 +24,7 @@ Frontend: http://localhost:5173
 Backend:  http://localhost:4100
 Swagger:  http://localhost:4100/api/docs
 БД:       localhost:5432
+pgAdmin:  http://localhost:5050
 ```
 
 Доступы по умолчанию:
@@ -30,6 +32,7 @@ Swagger:  http://localhost:4100/api/docs
 ```text
 Администратор: admin / admin123
 Документация API: docs / docs-password
+pgAdmin: admin@k-service44.ru / admin123
 ```
 
 ## Запуск в фоне
@@ -85,6 +88,36 @@ docker inspect questionnaire-frontend --format "{{json .State.Health}}"
 ```powershell
 docker inspect questionnaire-db --format "{{json .State.Health}}"
 ```
+
+## pgAdmin
+
+pgAdmin открывается в браузере:
+
+```text
+http://localhost:5050
+```
+
+Доступ по умолчанию:
+
+```text
+Email: admin@k-service44.ru
+Пароль: admin123
+```
+
+Если пароль переопределён в `.env`, используйте значение `PGADMIN_DEFAULT_PASSWORD`.
+
+Чтобы подключить PostgreSQL внутри pgAdmin:
+
+```text
+Name: Questionnaire DB
+Host name/address: db
+Port: 5432
+Maintenance database: questionnaire_runner
+Username: questionnaire
+Password: значение POSTGRES_PASSWORD из .env
+```
+
+Важно: внутри Docker-сети нужно указывать хост `db`, а не `localhost`.
 
 ## Остановка
 
@@ -307,6 +340,10 @@ SWAGGER_PASSWORD=strong-docs-password
 POSTGRES_DB=questionnaire_runner
 POSTGRES_USER=questionnaire
 POSTGRES_PASSWORD=strong-db-password
+
+PGADMIN_PORT=5050
+PGADMIN_DEFAULT_EMAIL=admin@k-service44.ru
+PGADMIN_DEFAULT_PASSWORD=strong-pgadmin-password
 
 JWT_SECRET=very-long-random-secret
 ```

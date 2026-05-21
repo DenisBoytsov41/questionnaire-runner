@@ -62,5 +62,21 @@ services:
       retries: 20
     restart: unless-stopped
 
+  pgadmin:
+    image: dpage/pgadmin4:9.15
+    container_name: questionnaire-pgadmin
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: "${PGADMIN_DEFAULT_EMAIL:-admin@k-service44.ru}"
+      PGADMIN_DEFAULT_PASSWORD: "${PGADMIN_DEFAULT_PASSWORD:-admin123}"
+    volumes:
+      - questionnaire-pgadmin-data:/var/lib/pgadmin
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   questionnaire-db-data:
+  questionnaire-pgadmin-data:
