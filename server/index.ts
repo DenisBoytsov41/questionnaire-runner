@@ -25,6 +25,7 @@ import {
   sendSwaggerUi,
   sendSwaggerUnauthorized,
 } from "./lib/swagger.js";
+import { attachRequestLogger, logInfo } from "./lib/logger.js";
 
 const port = Number(process.env.PORT ?? 4100);
 const jwtSecret = process.env.JWT_SECRET ?? "dev-secret-change-me";
@@ -65,6 +66,8 @@ const runPayloadSchema = z.object({
 });
 
 const server = createServer(async (req, res) => {
+  attachRequestLogger(req, res);
+
   if (req.method === "OPTIONS") {
     sendJson(res, 204, null);
     return;
@@ -201,9 +204,9 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(port, () => {
-  console.log(`Backend started: http://localhost:${port}`);
-  console.log("Начальный администратор создаётся автоматически, если хранилище пустое.");
-  console.log("Логин по умолчанию: admin, пароль: admin123. Для разработки можно задать ADMIN_LOGIN и ADMIN_PASSWORD.");
+  logInfo("server", "Backend запущен", { url: `http://localhost:${port}` });
+  logInfo("server", "Первый администратор создаётся автоматически, если таблица пользователей пустая");
+  logInfo("server", "Логин и пароль администратора можно задать через ADMIN_LOGIN и ADMIN_PASSWORD");
 });
 
 async function registerUser(login: string, password: string, fullName: string) {

@@ -8,6 +8,7 @@
     "dev:server": "node dist-server/server/index.js",
     "build": "tsc -b && vite build",
     "build:server": "tsc -p tsconfig.server.json",
+    "docker:logs": "powershell -ExecutionPolicy Bypass -File scripts/docker-logs.ps1",
     "lint": "eslint .",
     "migrate": "node dist-server/server/db/migrate.js",
     "preview": "vite preview"

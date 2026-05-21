@@ -92,6 +92,26 @@ docker compose up frontend
 docker compose logs
 ```
 
+Красивый общий просмотр с цветами по контейнерам:
+
+```powershell
+npm run docker:logs
+```
+
+Или напрямую:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/docker-logs.ps1
+```
+
+Цвета:
+
+```text
+frontend - голубой
+backend  - зелёный
+db       - фиолетовый
+```
+
 Логи backend:
 
 ```powershell
@@ -120,6 +140,12 @@ docker compose logs -f
 
 ```powershell
 docker compose logs -f backend
+```
+
+Красивый просмотр только backend:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/docker-logs.ps1 -Service backend
 ```
 
 ## Перезапуск контейнеров
