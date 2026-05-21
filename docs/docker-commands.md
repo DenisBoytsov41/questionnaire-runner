@@ -286,6 +286,23 @@ dockerDesktopLinuxEngine: The system cannot find the file specified
 3. Повторить команду docker compose up --build.
 ```
 
+## Если PostgreSQL 18 ругается на volume
+
+В PostgreSQL 18 изменилось ожидаемое место подключения volume. В проекте volume должен подключаться к:
+
+```text
+/var/lib/postgresql
+```
+
+Если до исправления уже был создан неудачный volume, удалите его и запустите проект заново:
+
+```powershell
+docker compose down -v
+docker compose up --build
+```
+
+Эта команда удалит данные БД текущего Docker-проекта. Для первого запуска это нормально.
+
 ## Если backend не стартует
 
 Посмотреть логи:
