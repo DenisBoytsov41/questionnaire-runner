@@ -328,6 +328,8 @@ docker compose restart backend
 npm run db:studio
 ```
 
+Подробная инструкция по миграциям лежит в [database-migrations.md](database-migrations.md).
+
 Если миграция ошибочная, backend не стартует, а в логах будет текст ошибки:
 
 ```powershell

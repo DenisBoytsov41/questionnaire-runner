@@ -65,6 +65,8 @@ npm run migrate
 npm run db:migration:create -- --name add_short_description
 ```
 
+Подробная инструкция по миграциям лежит в [database-migrations.md](database-migrations.md).
+
 ## Основные сущности
 
 - `users` - пользователи системы.

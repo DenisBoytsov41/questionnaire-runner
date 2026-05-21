@@ -110,7 +110,7 @@ npm run db:migration:create -- --name add_short_description
 npm run db:studio
 ```
 
-Подробная схема базы описана в [docs/database-design.md](docs/database-design.md).
+Подробная инструкция по миграциям лежит в [docs/database-migrations.md](docs/database-migrations.md). Схема базы описана в [docs/database-design.md](docs/database-design.md).
 
 ## Документация API
 
