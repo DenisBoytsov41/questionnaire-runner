@@ -77,6 +77,17 @@ const server = createServer(async (req, res) => {
     const context = await createContext(req, res, jwtSecret);
     const parts = getPathParts(context.url);
 
+    if (req.method === "GET" && parts[0] === "api" && parts[1] === "health") {
+      await readStorage();
+      sendJson(res, 200, {
+        status: "ok",
+        service: "backend",
+        database: "ok",
+        checkedAt: new Date().toISOString(),
+      });
+      return;
+    }
+
     if (parts[0] === "api" && parts[1] === "docs") {
       if (!isSwaggerAuthorized(req)) {
         sendSwaggerUnauthorized(res);

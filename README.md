@@ -52,6 +52,7 @@ docker compose up --build
 ```text
 Frontend: http://localhost:5173
 Backend:  http://localhost:4100
+Проверка backend: http://localhost:4100/api/health
 Документация API: http://localhost:4100/api/docs
 PostgreSQL: localhost:5432
 ```

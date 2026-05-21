@@ -46,6 +46,46 @@ docker compose up --build -d
 docker compose ps
 ```
 
+Если всё в порядке, у контейнеров будет состояние `healthy`.
+
+## Проверка состояния контейнеров
+
+Общая проверка:
+
+```powershell
+docker compose ps
+```
+
+Проверить backend из браузера или PowerShell:
+
+```powershell
+Invoke-RestMethod http://localhost:4100/api/health
+```
+
+Проверить frontend:
+
+```powershell
+Invoke-WebRequest -UseBasicParsing http://localhost:5173
+```
+
+Посмотреть подробное состояние healthcheck backend:
+
+```powershell
+docker inspect questionnaire-backend --format "{{json .State.Health}}"
+```
+
+Посмотреть подробное состояние healthcheck frontend:
+
+```powershell
+docker inspect questionnaire-frontend --format "{{json .State.Health}}"
+```
+
+Посмотреть подробное состояние healthcheck БД:
+
+```powershell
+docker inspect questionnaire-db --format "{{json .State.Health}}"
+```
+
 ## Остановка
 
 Остановить контейнеры без удаления данных БД:
