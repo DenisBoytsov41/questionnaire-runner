@@ -1,16 +1,21 @@
 import type { Questionnaire } from "../entities/questionnaire/types";
+import type { CurrentUser } from "../shared/api/backendApi";
 import { BrandHeader } from "../shared/ui/BrandHeader";
 
 interface QuestionnaireSelectPageProps {
   questionnaires: Questionnaire[];
   onSelectQuestionnaire: (questionnaire: Questionnaire) => void;
   onReset: () => void;
+  user: CurrentUser;
+  onLogout: () => void;
 }
 
 export function QuestionnaireSelectPage({
   questionnaires,
   onSelectQuestionnaire,
   onReset,
+  user,
+  onLogout,
 }: QuestionnaireSelectPageProps) {
   return (
     <main className="app-shell">
@@ -20,6 +25,8 @@ export function QuestionnaireSelectPage({
           label: "Загрузить другой файл",
           onClick: onReset,
         }}
+        user={user}
+        onLogout={onLogout}
       />
 
       <section className="select-page">

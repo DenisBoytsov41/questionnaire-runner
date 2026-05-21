@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { CurrentUser } from "../api/backendApi";
 
 interface BrandHeaderProps {
   subtitle: string;
@@ -6,6 +7,8 @@ interface BrandHeaderProps {
     label: string;
     onClick: () => void;
   };
+  user?: CurrentUser;
+  onLogout?: () => void;
 }
 
 type TextScale = "normal" | "large" | "extra";
@@ -42,7 +45,7 @@ const visionOptions: Array<{ value: VisionMode; label: string }> = [
   { value: "easy", label: "Повышенная читаемость" },
 ];
 
-export function BrandHeader({ subtitle, action }: BrandHeaderProps) {
+export function BrandHeader({ subtitle, action, user, onLogout }: BrandHeaderProps) {
   const [settings, setSettings] = useState<UiSettings>(readSettings);
   const [isViewMenuOpen, setIsViewMenuOpen] = useState(false);
   const viewMenuRef = useRef<HTMLDivElement | null>(null);
@@ -179,16 +182,34 @@ export function BrandHeader({ subtitle, action }: BrandHeaderProps) {
           )}
         </div>
 
-        <button type="button" className="operator-profile" aria-label="Профиль оператора">
+        <div className="operator-profile" aria-label="Профиль сотрудника">
           <span className="operator-avatar">ОП</span>
           <span className="operator-profile-text">
-            <strong>Оператор</strong>
-            <small>Вход позже</small>
+            <strong>{user?.fullName || "Сотрудник"}</strong>
+            <small>{getRoleLabel(user?.role)}</small>
           </span>
-        </button>
+
+          {onLogout && (
+            <button type="button" className="operator-logout" onClick={onLogout}>
+              Выйти
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
+}
+
+function getRoleLabel(role: CurrentUser["role"] | undefined): string {
+  if (role === "admin") {
+    return "Администратор";
+  }
+
+  if (role === "operator") {
+    return "Оператор";
+  }
+
+  return "Без доступа";
 }
 
 function SettingButtons<TValue extends string>({
