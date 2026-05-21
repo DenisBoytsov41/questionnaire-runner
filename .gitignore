@@ -11,6 +11,9 @@ node_modules
 dist
 dist-server
 dist-ssr
+.env
+.env.*
+!.env.example
 *.local
 server/data/*.json
 
