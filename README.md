@@ -58,6 +58,8 @@ PostgreSQL: localhost:5432
 
 Backend ждёт готовности PostgreSQL, применяет миграции из `db/migrations` и затем запускает API.
 
+Подробная инструкция по Docker-командам лежит в [docs/docker-commands.md](docs/docker-commands.md).
+
 ## Переменные окружения
 
 Пример файла окружения лежит в [.env.example](.env.example).
