@@ -7,8 +7,12 @@ export interface StoredUser {
   id: string;
   login: string;
   fullName: string;
+  email: string;
+  phone: string;
+  position: string;
   role: UserRole;
   active: boolean;
+  preferences: UserPreferences;
   passwordHash: string;
   passwordSalt: string;
   createdAt: string;
@@ -19,8 +23,18 @@ export interface PublicUser {
   id: string;
   login: string;
   fullName: string;
+  email: string;
+  phone: string;
+  position: string;
   role: UserRole;
   active: boolean;
+  preferences: UserPreferences;
+}
+
+export interface UserPreferences {
+  theme: "light" | "dark";
+  textSize: "normal" | "large" | "xlarge";
+  readingMode: "normal" | "high-contrast";
 }
 
 export interface StoredQuestionnaireVersion {
@@ -59,11 +73,4 @@ export interface QuestionnaireRun {
   startedAt: string;
   updatedAt: string;
   finishedAt: string | null;
-}
-
-export interface AppStorage {
-  users: StoredUser[];
-  questionnaires: StoredQuestionnaire[];
-  questionnaireVersions: StoredQuestionnaireVersion[];
-  runs: QuestionnaireRun[];
 }

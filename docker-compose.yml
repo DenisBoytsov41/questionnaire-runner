@@ -70,11 +70,19 @@ services:
     environment:
       PGADMIN_DEFAULT_EMAIL: "${PGADMIN_DEFAULT_EMAIL:-admin@k-service44.ru}"
       PGADMIN_DEFAULT_PASSWORD: "${PGADMIN_DEFAULT_PASSWORD:-admin123}"
+      PGADMIN_REPLACE_SERVERS_ON_STARTUP: "True"
     volumes:
       - questionnaire-pgadmin-data:/var/lib/pgadmin
+      - ./docker/pgadmin/servers.json:/pgadmin4/servers.json:ro
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/misc/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
     restart: unless-stopped
 
 volumes:

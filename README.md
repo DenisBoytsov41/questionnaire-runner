@@ -33,7 +33,7 @@ npm run dev:server
 
 ## Запуск в Docker
 
-Проект подготовлен к запуску в трёх контейнерах:
+Проект подготовлен к запуску в четырёх контейнерах:
 
 ```text
 frontend  - web-интерфейс
@@ -59,7 +59,9 @@ PostgreSQL: localhost:5432
 pgAdmin:  http://localhost:5050
 ```
 
-Backend ждёт готовности PostgreSQL, применяет миграции из `db/migrations` и затем запускает API.
+Backend ждёт готовности PostgreSQL, применяет Prisma-миграции из `prisma/migrations` и затем запускает API.
+
+В pgAdmin заранее добавлен сервер `Questionnaire PostgreSQL`. После входа на `http://localhost:5050` откройте `Servers -> Questionnaire PostgreSQL -> Databases -> questionnaire_runner`; если pgAdmin попросит пароль, используйте `POSTGRES_PASSWORD` из `.env`.
 
 Подробная инструкция по Docker-командам лежит в [docs/docker-commands.md](docs/docker-commands.md).
 
@@ -86,7 +88,7 @@ npm run dev:server
 
 ## Миграции базы данных
 
-Миграции лежат в папке `db/migrations`.
+Схема базы описана в [prisma/schema.prisma](prisma/schema.prisma). Новые изменения структуры делаем через Prisma: меняем схему, создаём файл миграции, проверяем его и применяем.
 
 Локальный запуск миграций:
 
@@ -96,7 +98,19 @@ $env:DATABASE_URL="postgresql://questionnaire:change-me@localhost:5432/questionn
 npm run migrate
 ```
 
-Схема будущей базы описана в [docs/database-design.md](docs/database-design.md).
+Создать новую миграцию после изменения `prisma/schema.prisma`:
+
+```powershell
+npm run db:migration:create -- --name add_short_description
+```
+
+Посмотреть базу через Prisma Studio:
+
+```powershell
+npm run db:studio
+```
+
+Подробная схема базы описана в [docs/database-design.md](docs/database-design.md).
 
 ## Документация API
 
@@ -129,6 +143,7 @@ admin     - администратор, может импортировать с
 POST /api/auth/register
 POST /api/auth/login
 GET  /api/me
+PATCH /api/me/profile
 
 GET   /api/users
 PATCH /api/users/:id
@@ -136,11 +151,13 @@ PATCH /api/users/:id
 GET  /api/questionnaires
 GET  /api/questionnaires/:id
 POST /api/admin/questionnaires/import
+POST /api/admin/questionnaires/:id/publish
 
 POST  /api/questionnaire-runs
+GET   /api/questionnaire-runs
+GET   /api/questionnaire-runs/:id
 PATCH /api/questionnaire-runs/:id/draft
 POST  /api/questionnaire-runs/:id/finish
-GET   /api/questionnaire-runs
 ```
 
 ## Быстрая проверка backend

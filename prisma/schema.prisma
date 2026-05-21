@@ -1,0 +1,119 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  user
+  operator
+  admin
+
+  @@map("user_role")
+}
+
+enum QuestionnaireRunStatus {
+  draft
+  finished
+
+  @@map("questionnaire_run_status")
+}
+
+model User {
+  id               String                 @id
+  login            String                 @unique
+  fullName         String                 @map("full_name")
+  email            String                 @default("")
+  phone            String                 @default("")
+  position         String                 @default("")
+  role             UserRole               @default(user)
+  active           Boolean                @default(true)
+  preferencesJson  Json                   @default("{\"theme\":\"light\",\"textSize\":\"normal\",\"readingMode\":\"normal\"}") @map("preferences_json")
+  passwordHash     String                 @map("password_hash")
+  passwordSalt     String                 @map("password_salt")
+  createdAt        DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime               @default(now()) @map("updated_at") @db.Timestamptz(6)
+  importedVersions QuestionnaireVersion[] @relation("ImportedVersions")
+  runs             QuestionnaireRun[]
+  auditLogs        AuditLog[]
+
+  @@index([role], map: "users_role_idx")
+  @@index([active, role], map: "users_active_role_idx")
+  @@map("users")
+}
+
+model Questionnaire {
+  id              String                 @id
+  title           String
+  activeVersionId String?                @map("active_version_id")
+  archived        Boolean                @default(false)
+  createdAt       DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime               @default(now()) @map("updated_at") @db.Timestamptz(6)
+  activeVersion   QuestionnaireVersion?  @relation("ActiveQuestionnaireVersion", fields: [activeVersionId], references: [id])
+  versions        QuestionnaireVersion[] @relation("QuestionnaireVersions")
+  runs            QuestionnaireRun[]
+
+  @@index([archived], map: "questionnaires_archived_idx")
+  @@map("questionnaires")
+}
+
+model QuestionnaireVersion {
+  id                      String             @id
+  questionnaireId         String             @map("questionnaire_id")
+  version                 Int
+  title                   String
+  active                  Boolean            @default(true)
+  published               Boolean            @default(false)
+  sourceJson              Json               @map("source_json")
+  importedById            String?            @map("imported_by")
+  importedAt              DateTime           @default(now()) @map("imported_at") @db.Timestamptz(6)
+  questionnaire           Questionnaire      @relation("QuestionnaireVersions", fields: [questionnaireId], references: [id])
+  activeForQuestionnaires Questionnaire[]    @relation("ActiveQuestionnaireVersion")
+  importedBy              User?              @relation("ImportedVersions", fields: [importedById], references: [id])
+  runs                    QuestionnaireRun[]
+
+  @@unique([questionnaireId, version])
+  @@index([questionnaireId, version(sort: Desc)], map: "questionnaire_versions_questionnaire_idx")
+  @@map("questionnaire_versions")
+}
+
+model QuestionnaireRun {
+  id                     String                 @id
+  questionnaireId        String                 @map("questionnaire_id")
+  questionnaireVersionId String                 @map("questionnaire_version_id")
+  operatorId             String?                @map("operator_id")
+  status                 QuestionnaireRunStatus @default(draft)
+  currentQuestionId      String?                @map("current_question_id")
+  answersJson            Json                   @default("{}") @map("answers_json")
+  routeJson              Json                   @default("[]") @map("route_json")
+  messagesJson           Json                   @default("[]") @map("messages_json")
+  verdictsJson           Json                   @default("[]") @map("verdicts_json")
+  summaryText            String                 @default("") @map("summary_text")
+  startedAt              DateTime               @default(now()) @map("started_at") @db.Timestamptz(6)
+  updatedAt              DateTime               @default(now()) @map("updated_at") @db.Timestamptz(6)
+  finishedAt             DateTime?              @map("finished_at") @db.Timestamptz(6)
+  questionnaire          Questionnaire          @relation(fields: [questionnaireId], references: [id])
+  questionnaireVersion   QuestionnaireVersion   @relation(fields: [questionnaireVersionId], references: [id])
+  operator               User?                  @relation(fields: [operatorId], references: [id])
+
+  @@index([operatorId, updatedAt(sort: Desc)], map: "questionnaire_runs_operator_idx")
+  @@index([questionnaireId, startedAt(sort: Desc)], map: "questionnaire_runs_questionnaire_idx")
+  @@index([status], map: "questionnaire_runs_status_idx")
+  @@map("questionnaire_runs")
+}
+
+model AuditLog {
+  id          String   @id
+  userId      String?  @map("user_id")
+  action      String
+  entityType  String   @map("entity_type")
+  entityId    String?  @map("entity_id")
+  detailsJson Json     @default("{}") @map("details_json")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  user        User?    @relation(fields: [userId], references: [id])
+
+  @@index([createdAt(sort: Desc)], map: "audit_log_created_idx")
+  @@map("audit_log")
+}

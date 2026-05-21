@@ -6,6 +6,8 @@ COPY package*.json ./
 RUN npm ci
 
 COPY tsconfig.server.json ./
+COPY prisma.config.ts ./
+COPY prisma ./prisma
 COPY server ./server
 COPY db ./db
 RUN npm run build:server
@@ -20,7 +22,9 @@ RUN npm ci --omit=dev
 
 COPY --from=build /app/dist-server ./dist-server
 COPY --from=build /app/db ./db
+COPY --from=build /app/prisma.config.ts ./prisma.config.ts
+COPY --from=build /app/prisma ./prisma
 
 EXPOSE 4100
 
-CMD ["sh", "-c", "node dist-server/server/db/migrate.js && node dist-server/server/index.js"]
+CMD ["sh", "-c", "node dist-server/server/db/prisma-migrate.js && node dist-server/server/index.js"]

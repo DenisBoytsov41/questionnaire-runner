@@ -140,8 +140,30 @@ const openApiDocument = {
           id: { type: "string", example: "usr_123" },
           login: { type: "string", example: "admin" },
           fullName: { type: "string", example: "Администратор" },
+          email: { type: "string", example: "operator@k-service44.ru" },
+          phone: { type: "string", example: "+7 900 000-00-00" },
+          position: { type: "string", example: "Оператор первой линии" },
           role: { type: "string", enum: ["user", "operator", "admin"] },
           active: { type: "boolean" },
+          preferences: { $ref: "#/components/schemas/UserPreferences" },
+        },
+      },
+      UserPreferences: {
+        type: "object",
+        properties: {
+          theme: { type: "string", enum: ["light", "dark"] },
+          textSize: { type: "string", enum: ["normal", "large", "xlarge"] },
+          readingMode: { type: "string", enum: ["normal", "high-contrast"] },
+        },
+      },
+      UpdateProfileRequest: {
+        type: "object",
+        properties: {
+          fullName: { type: "string", example: "Иванов Иван" },
+          email: { type: "string", example: "operator@k-service44.ru" },
+          phone: { type: "string", example: "+7 900 000-00-00" },
+          position: { type: "string", example: "Оператор первой линии" },
+          preferences: { $ref: "#/components/schemas/UserPreferences" },
         },
       },
       LoginResponse: {
@@ -157,6 +179,12 @@ const openApiDocument = {
         properties: {
           role: { type: "string", enum: ["user", "operator", "admin"] },
           active: { type: "boolean" },
+        },
+      },
+      PublishQuestionnaireRequest: {
+        type: "object",
+        properties: {
+          versionId: { type: "string", example: "qv_123" },
         },
       },
       CreateRunRequest: {
@@ -243,6 +271,18 @@ const openApiDocument = {
         },
       },
     },
+    "/api/me/profile": {
+      patch: {
+        tags: ["Вход"],
+        security: [{ bearerAuth: [] }],
+        summary: "Обновить профиль и настройки текущего пользователя",
+        requestBody: jsonBody("#/components/schemas/UpdateProfileRequest"),
+        responses: {
+          200: response("Профиль обновлён", { user: { $ref: "#/components/schemas/User" } }),
+          401: errorResponse("Нужно войти"),
+        },
+      },
+    },
     "/api/users": {
       get: {
         tags: ["Пользователи"],
@@ -312,6 +352,22 @@ const openApiDocument = {
         },
       },
     },
+    "/api/admin/questionnaires/{id}/publish": {
+      post: {
+        tags: ["Опросники"],
+        security: [{ bearerAuth: [] }],
+        summary: "Опубликовать выбранную или последнюю версию опросника, только администратор",
+        parameters: [pathParameter("id", "Идентификатор опросника")],
+        requestBody: jsonBody("#/components/schemas/PublishQuestionnaireRequest"),
+        responses: {
+          200: response("Версия опубликована", {
+            questionnaire: { type: "object" },
+            version: { type: "object" },
+          }),
+          404: errorResponse("Опросник или версия не найдены"),
+        },
+      },
+    },
     "/api/questionnaire-runs": {
       get: {
         tags: ["Прохождения"],
@@ -342,6 +398,18 @@ const openApiDocument = {
         requestBody: jsonBody("#/components/schemas/RunPayloadRequest"),
         responses: {
           200: response("Черновик сохранён", { run: { $ref: "#/components/schemas/QuestionnaireRun" } }),
+        },
+      },
+    },
+    "/api/questionnaire-runs/{id}": {
+      get: {
+        tags: ["Прохождения"],
+        security: [{ bearerAuth: [] }],
+        summary: "Получить одно прохождение",
+        parameters: [pathParameter("id", "Идентификатор прохождения")],
+        responses: {
+          200: response("Прохождение", { run: { $ref: "#/components/schemas/QuestionnaireRun" } }),
+          404: errorResponse("Прохождение не найдено"),
         },
       },
     },

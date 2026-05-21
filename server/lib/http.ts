@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { PublicUser, UserRole } from "../types.js";
-import { readStorage } from "./storage.js";
+import { getUserById } from "./storage.js";
 import { toPublicUser, verifyToken } from "./crypto.js";
 
 export interface RequestContext {
@@ -28,16 +28,15 @@ export async function createContext(
   const url = new URL(req.url ?? "/", `http://${host}`);
   const token = getBearerToken(req);
   const tokenPayload = token ? verifyToken(token, jwtSecret) : null;
-  const storage = tokenPayload ? await readStorage() : null;
   const user = tokenPayload
-    ? storage?.users.find((item) => item.id === tokenPayload.userId && item.active) ?? null
+    ? await getUserById(tokenPayload.userId)
     : null;
 
   return {
     req,
     res,
     url,
-    user: user ? toPublicUser(user) : null,
+    user: user?.active ? toPublicUser(user) : null,
   };
 }
 

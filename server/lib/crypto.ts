@@ -77,8 +77,12 @@ export function toPublicUser(user: StoredUser): PublicUser {
     id: user.id,
     login: user.login,
     fullName: user.fullName,
+    email: user.email,
+    phone: user.phone,
+    position: user.position,
     role: user.role,
     active: user.active,
+    preferences: user.preferences,
   };
 }
 

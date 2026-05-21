@@ -1,6 +1,6 @@
 # Docker: запуск и управление проектом
 
-Проект рассчитан на запуск в трёх контейнерах:
+Проект рассчитан на запуск в четырёх контейнерах:
 
 ```text
 frontend  - web-интерфейс оператора
@@ -89,6 +89,12 @@ docker inspect questionnaire-frontend --format "{{json .State.Health}}"
 docker inspect questionnaire-db --format "{{json .State.Health}}"
 ```
 
+Посмотреть подробное состояние healthcheck pgAdmin:
+
+```powershell
+docker inspect questionnaire-pgadmin --format "{{json .State.Health}}"
+```
+
 ## pgAdmin
 
 pgAdmin открывается в браузере:
@@ -106,18 +112,23 @@ Email: admin@k-service44.ru
 
 Если пароль переопределён в `.env`, используйте значение `PGADMIN_DEFAULT_PASSWORD`.
 
-Чтобы подключить PostgreSQL внутри pgAdmin:
+Сервер PostgreSQL для проекта уже добавлен в pgAdmin через файл `docker/pgadmin/servers.json`.
+При каждом запуске pgAdmin перечитывает этот файл, поэтому сервер должен появиться автоматически.
+После входа откройте:
 
 ```text
-Name: Questionnaire DB
-Host name/address: db
-Port: 5432
-Maintenance database: questionnaire_runner
-Username: questionnaire
-Password: значение POSTGRES_PASSWORD из .env
+Servers -> Questionnaire PostgreSQL -> Databases -> questionnaire_runner
 ```
 
+При первом подключении pgAdmin может попросить пароль от PostgreSQL. Укажите значение `POSTGRES_PASSWORD` из `.env`.
+
 Важно: внутри Docker-сети нужно указывать хост `db`, а не `localhost`.
+
+Если сервер всё равно не появился, перезапустите только pgAdmin:
+
+```powershell
+docker compose restart pgadmin
+```
 
 ## Остановка
 
@@ -183,6 +194,7 @@ powershell -ExecutionPolicy Bypass -File scripts/docker-logs.ps1
 frontend - голубой
 backend  - зелёный
 db       - фиолетовый
+pgadmin  - жёлтый
 ```
 
 Логи backend:
@@ -265,16 +277,61 @@ docker compose config
 
 В обычном Docker-запуске миграции выполняются автоматически перед запуском backend.
 
+Схема базы описана в Prisma:
+
+```text
+prisma/schema.prisma
+```
+
+Файлы миграций лежат в папке:
+
+```text
+prisma/migrations
+```
+
+Prisma ведёт служебную таблицу `_prisma_migrations`, проверяет, какие миграции уже применены, и выполняет только новые. Уже применённую миграцию не редактируем: меняем `prisma/schema.prisma` и создаём следующую миграцию.
+
 Если нужно применить миграции вручную внутри backend-контейнера:
 
 ```powershell
-docker compose run --rm backend node dist-server/server/db/migrate.js
+docker compose run --rm backend npm run migrate
 ```
 
 Если нужно посмотреть список применённых миграций:
 
 ```powershell
-docker compose exec db psql -U questionnaire -d questionnaire_runner -c "select * from schema_migrations order by applied_at;"
+docker compose exec db psql -U questionnaire -d questionnaire_runner -c "select migration_name, finished_at from _prisma_migrations order by started_at;"
+```
+
+Создать новую миграцию:
+
+```powershell
+npm run db:migration:create -- --name add_short_description
+```
+
+После этого проверьте созданный файл в `prisma/migrations`, затем примените миграцию локально:
+
+```powershell
+npm run build:server
+npm run migrate
+```
+
+Или перезапустите backend в Docker, он применит новые миграции сам:
+
+```powershell
+docker compose restart backend
+```
+
+Открыть Prisma Studio для просмотра данных:
+
+```powershell
+npm run db:studio
+```
+
+Если миграция ошибочная, backend не стартует, а в логах будет текст ошибки:
+
+```powershell
+docker compose logs backend
 ```
 
 ## Работа с PostgreSQL
@@ -294,7 +351,7 @@ docker compose exec db psql -U questionnaire -d questionnaire_runner -c "\dt"
 Показать пользователей:
 
 ```powershell
-docker compose exec db psql -U questionnaire -d questionnaire_runner -c "select id, login, full_name, role, active from users;"
+docker compose exec db psql -U questionnaire -d questionnaire_runner -c "select id, login, full_name, email, phone, position, role, active from users;"
 ```
 
 Показать опросники:

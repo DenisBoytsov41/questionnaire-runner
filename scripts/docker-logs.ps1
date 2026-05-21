@@ -9,9 +9,11 @@ $serviceColors = @{
   "questionnaire-frontend" = "Cyan"
   "questionnaire-backend" = "Green"
   "questionnaire-db" = "Magenta"
+  "questionnaire-pgadmin" = "Yellow"
   "frontend" = "Cyan"
   "backend" = "Green"
   "db" = "Magenta"
+  "pgadmin" = "Yellow"
 }
 
 function Write-LogLine {

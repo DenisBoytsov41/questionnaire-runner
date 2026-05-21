@@ -3,11 +3,10 @@ import { z } from "zod";
 import {
   isQuestionnaireBundle,
   questionnaireInputSchema,
-  type Questionnaire,
   validateQuestionnaireContract,
 } from "./lib/questionnaireContract.js";
-import type { AppStorage, QuestionnaireRun, StoredQuestionnaireVersion, UserRole } from "./types.js";
-import { createId, hashPassword, signToken, toPublicUser, verifyPassword } from "./lib/crypto.js";
+import type { UserPreferences } from "./types.js";
+import { signToken, toPublicUser, verifyPassword } from "./lib/crypto.js";
 import {
   createContext,
   getPathParts,
@@ -18,7 +17,25 @@ import {
   sendError,
   sendJson,
 } from "./lib/http.js";
-import { readStorage, updateStorage } from "./lib/storage.js";
+import {
+  checkDatabase,
+  createRun,
+  createUser,
+  findUserByLogin,
+  finishRun,
+  getPublishedQuestionnaire,
+  getRunForUser,
+  importQuestionnaireVersions,
+  listPublishedQuestionnaires,
+  listRunsForUser,
+  listUsers,
+  publishQuestionnaireVersion,
+  StorageConflictError,
+  StorageForbiddenError,
+  updateRunDraft,
+  updateUserAdmin,
+  updateUserProfile,
+} from "./lib/storage.js";
 import {
   isSwaggerAuthorized,
   sendOpenApiDocument,
@@ -46,8 +63,26 @@ const updateUserRoleSchema = z.object({
   active: z.boolean().optional(),
 });
 
+const userPreferencesSchema = z.object({
+  theme: z.enum(["light", "dark"]).default("light"),
+  textSize: z.enum(["normal", "large", "xlarge"]).default("normal"),
+  readingMode: z.enum(["normal", "high-contrast"]).default("normal"),
+});
+
+const updateProfileSchema = z.object({
+  fullName: z.string().trim().min(2).optional(),
+  email: z.string().trim().email().or(z.literal("")).optional(),
+  phone: z.string().trim().max(50).optional(),
+  position: z.string().trim().max(120).optional(),
+  preferences: userPreferencesSchema.optional(),
+});
+
 const createRunSchema = z.object({
   questionnaireId: z.string().min(1),
+});
+
+const publishQuestionnaireSchema = z.object({
+  versionId: z.string().min(1).optional(),
 });
 
 const runPayloadSchema = z.object({
@@ -78,7 +113,7 @@ const server = createServer(async (req, res) => {
     const parts = getPathParts(context.url);
 
     if (req.method === "GET" && parts[0] === "api" && parts[1] === "health") {
-      await readStorage();
+      await checkDatabase();
       sendJson(res, 200, {
         status: "ok",
         service: "backend",
@@ -112,7 +147,7 @@ const server = createServer(async (req, res) => {
 
     if (req.method === "POST" && parts[1] === "auth" && parts[2] === "register") {
       const body = registerSchema.parse(await readJsonBody(req));
-      const user = await registerUser(body.login, body.password, body.fullName);
+      const user = await createUser(body);
       sendJson(res, 201, { user });
       return;
     }
@@ -129,32 +164,64 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === "PATCH" && parts[1] === "me" && parts[2] === "profile") {
+      const currentUser = requireUser(context);
+      const body = updateProfileSchema.parse(await readJsonBody(req));
+      const user = await updateUserProfile({
+        userId: currentUser.id,
+        fullName: body.fullName,
+        email: body.email,
+        phone: body.phone,
+        position: body.position,
+        preferences: body.preferences as UserPreferences | undefined,
+      });
+
+      if (!user) {
+        throw new HttpError(404, "Пользователь не найден.");
+      }
+
+      sendJson(res, 200, { user });
+      return;
+    }
+
     if (req.method === "GET" && parts[1] === "users") {
       requireRole(context, ["admin"]);
-      const storage = await readStorage();
-      sendJson(res, 200, { users: storage.users.map(toPublicUser) });
+      sendJson(res, 200, { users: await listUsers() });
       return;
     }
 
     if (req.method === "PATCH" && parts[1] === "users" && parts[2]) {
       requireRole(context, ["admin"]);
       const body = updateUserRoleSchema.parse(await readJsonBody(req));
-      const user = await updateUserRole(parts[2], body.role, body.active);
+      const user = await updateUserAdmin({
+        userId: parts[2],
+        role: body.role,
+        active: body.active,
+      });
+
+      if (!user) {
+        throw new HttpError(404, "Пользователь не найден.");
+      }
+
       sendJson(res, 200, { user });
       return;
     }
 
     if (req.method === "GET" && parts[1] === "questionnaires" && !parts[2]) {
       requireRole(context, ["operator", "admin"]);
-      const storage = await readStorage();
-      sendJson(res, 200, { questionnaires: listQuestionnaires(storage) });
+      sendJson(res, 200, { questionnaires: await listPublishedQuestionnaires() });
       return;
     }
 
     if (req.method === "GET" && parts[1] === "questionnaires" && parts[2]) {
       requireRole(context, ["operator", "admin"]);
-      const storage = await readStorage();
-      sendJson(res, 200, { questionnaire: getPublishedQuestionnaire(storage, parts[2]) });
+      const questionnaire = await getPublishedQuestionnaire(parts[2]);
+
+      if (!questionnaire) {
+        throw new HttpError(404, "Опросник не найден.");
+      }
+
+      sendJson(res, 200, { questionnaire });
       return;
     }
 
@@ -166,10 +233,38 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (
+      req.method === "POST"
+      && parts[1] === "admin"
+      && parts[2] === "questionnaires"
+      && parts[3]
+      && parts[4] === "publish"
+    ) {
+      const admin = requireRole(context, ["admin"]);
+      const body = publishQuestionnaireSchema.parse(await readJsonBody(req));
+      const result = await publishQuestionnaireVersion({
+        questionnaireId: parts[3],
+        versionId: body.versionId,
+        adminId: admin.id,
+      });
+
+      if (!result) {
+        throw new HttpError(404, "Опросник или версия не найдены.");
+      }
+
+      sendJson(res, 200, result);
+      return;
+    }
+
     if (req.method === "POST" && parts[1] === "questionnaire-runs" && !parts[2]) {
       const user = requireRole(context, ["operator", "admin"]);
       const body = createRunSchema.parse(await readJsonBody(req));
       const run = await createRun(body.questionnaireId, user.id);
+
+      if (!run) {
+        throw new HttpError(404, "Опросник не найден.");
+      }
+
       sendJson(res, 201, { run });
       return;
     }
@@ -177,7 +272,17 @@ const server = createServer(async (req, res) => {
     if (req.method === "PATCH" && parts[1] === "questionnaire-runs" && parts[2] && parts[3] === "draft") {
       const user = requireRole(context, ["operator", "admin"]);
       const body = runPayloadSchema.parse(await readJsonBody(req));
-      const run = await updateRunDraft(parts[2], user.id, user.role, body);
+      const run = await updateRunDraft({
+        runId: parts[2],
+        userId: user.id,
+        role: user.role,
+        payload: body,
+      });
+
+      if (!run) {
+        throw new HttpError(404, "Прохождение не найдено.");
+      }
+
       sendJson(res, 200, { run });
       return;
     }
@@ -185,18 +290,36 @@ const server = createServer(async (req, res) => {
     if (req.method === "POST" && parts[1] === "questionnaire-runs" && parts[2] && parts[3] === "finish") {
       const user = requireRole(context, ["operator", "admin"]);
       const body = runPayloadSchema.parse(await readJsonBody(req));
-      const run = await finishRun(parts[2], user.id, user.role, body);
+      const run = await finishRun({
+        runId: parts[2],
+        userId: user.id,
+        role: user.role,
+        payload: body,
+      });
+
+      if (!run) {
+        throw new HttpError(404, "Прохождение не найдено.");
+      }
+
       sendJson(res, 200, { run });
       return;
     }
 
-    if (req.method === "GET" && parts[1] === "questionnaire-runs") {
+    if (req.method === "GET" && parts[1] === "questionnaire-runs" && !parts[2]) {
       const user = requireRole(context, ["operator", "admin"]);
-      const storage = await readStorage();
-      const runs = user.role === "admin"
-        ? storage.runs
-        : storage.runs.filter((run) => run.operatorId === user.id);
-      sendJson(res, 200, { runs });
+      sendJson(res, 200, { runs: await listRunsForUser(user.id, user.role) });
+      return;
+    }
+
+    if (req.method === "GET" && parts[1] === "questionnaire-runs" && parts[2]) {
+      const user = requireRole(context, ["operator", "admin"]);
+      const run = await getRunForUser(parts[2], user.id, user.role);
+
+      if (!run) {
+        throw new HttpError(404, "Прохождение не найдено.");
+      }
+
+      sendJson(res, 200, { run });
       return;
     }
 
@@ -210,6 +333,16 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (error instanceof StorageConflictError) {
+      sendError(res, new HttpError(409, error.message));
+      return;
+    }
+
+    if (error instanceof StorageForbiddenError) {
+      sendError(res, new HttpError(403, error.message));
+      return;
+    }
+
     sendError(res, error);
   }
 });
@@ -220,37 +353,8 @@ server.listen(port, () => {
   logInfo("server", "Логин и пароль администратора можно задать через ADMIN_LOGIN и ADMIN_PASSWORD");
 });
 
-async function registerUser(login: string, password: string, fullName: string) {
-  return updateStorage((storage) => {
-    const normalizedLogin = login.toLowerCase();
-
-    if (storage.users.some((user) => user.login.toLowerCase() === normalizedLogin)) {
-      throw new HttpError(409, "Пользователь с таким логином уже есть.");
-    }
-
-    const now = new Date().toISOString();
-    const { hash, salt } = hashPassword(password);
-    const user = {
-      id: createId("usr"),
-      login,
-      fullName,
-      role: "user" as UserRole,
-      active: true,
-      passwordHash: hash,
-      passwordSalt: salt,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    storage.users.push(user);
-
-    return toPublicUser(user);
-  });
-}
-
 async function login(loginValue: string, password: string) {
-  const storage = await readStorage();
-  const user = storage.users.find((item) => item.login.toLowerCase() === loginValue.toLowerCase());
+  const user = await findUserByLogin(loginValue);
 
   if (!user || !user.active || !verifyPassword(password, user)) {
     throw new HttpError(401, "Неверный логин или пароль.");
@@ -262,22 +366,6 @@ async function login(loginValue: string, password: string) {
     user: publicUser,
     token: signToken(publicUser, jwtSecret),
   };
-}
-
-async function updateUserRole(userId: string, role: UserRole, active: boolean | undefined) {
-  return updateStorage((storage) => {
-    const user = storage.users.find((item) => item.id === userId);
-
-    if (!user) {
-      throw new HttpError(404, "Пользователь не найден.");
-    }
-
-    user.role = role;
-    user.active = active ?? user.active;
-    user.updatedAt = new Date().toISOString();
-
-    return toPublicUser(user);
-  });
 }
 
 async function importQuestionnaires(input: unknown, importedBy: string) {
@@ -294,185 +382,7 @@ async function importQuestionnaires(input: unknown, importedBy: string) {
     throw new HttpError(400, errors.join("; "));
   }
 
-  return updateStorage((storage) => {
-    const importedVersions = questionnaires.map((questionnaire) => (
-      upsertQuestionnaire(storage, questionnaire, importedBy)
-    ));
-
-    return {
-      imported: importedVersions.map((version) => ({
-        questionnaireId: version.questionnaireId,
-        versionId: version.id,
-        version: version.version,
-        title: version.title,
-      })),
-    };
-  });
-}
-
-function upsertQuestionnaire(
-  storage: AppStorage,
-  questionnaire: Questionnaire,
-  importedBy: string,
-): StoredQuestionnaireVersion {
-  const now = new Date().toISOString();
-  const existingQuestionnaire = storage.questionnaires.find((item) => item.id === questionnaire.id);
-  const previousVersions = storage.questionnaireVersions.filter((item) => item.questionnaireId === questionnaire.id);
-  const versionNumber = previousVersions.length + 1;
-  const version: StoredQuestionnaireVersion = {
-    id: createId("qv"),
-    questionnaireId: questionnaire.id,
-    version: versionNumber,
-    title: questionnaire.title,
-    active: questionnaire.active,
-    published: true,
-    source: questionnaire,
-    importedBy,
-    importedAt: now,
-  };
-
-  storage.questionnaireVersions.push(version);
-
-  if (existingQuestionnaire) {
-    existingQuestionnaire.title = questionnaire.title;
-    existingQuestionnaire.activeVersionId = version.id;
-    existingQuestionnaire.archived = !questionnaire.active;
-    existingQuestionnaire.updatedAt = now;
-  } else {
-    storage.questionnaires.push({
-      id: questionnaire.id,
-      title: questionnaire.title,
-      activeVersionId: version.id,
-      archived: !questionnaire.active,
-      createdAt: now,
-      updatedAt: now,
-    });
-  }
-
-  return version;
-}
-
-function listQuestionnaires(storage: AppStorage) {
-  return storage.questionnaires
-    .filter((questionnaire) => !questionnaire.archived)
-    .map((questionnaire) => {
-      const version = storage.questionnaireVersions.find((item) => item.id === questionnaire.activeVersionId);
-
-      return {
-        id: questionnaire.id,
-        title: questionnaire.title,
-        version: version?.version ?? 0,
-        importedAt: version?.importedAt ?? questionnaire.updatedAt,
-      };
-    });
-}
-
-function getPublishedQuestionnaire(storage: AppStorage, questionnaireId: string) {
-  const questionnaire = storage.questionnaires.find((item) => item.id === questionnaireId && !item.archived);
-  const version = questionnaire
-    ? storage.questionnaireVersions.find((item) => item.id === questionnaire.activeVersionId)
-    : null;
-
-  if (!questionnaire || !version) {
-    throw new HttpError(404, "Опросник не найден.");
-  }
-
   return {
-    id: questionnaire.id,
-    title: questionnaire.title,
-    version: version.version,
-    source: version.source,
+    imported: await importQuestionnaireVersions({ questionnaires, importedBy }),
   };
-}
-
-async function createRun(questionnaireId: string, operatorId: string) {
-  return updateStorage((storage) => {
-    const questionnaire = storage.questionnaires.find((item) => item.id === questionnaireId && !item.archived);
-
-    if (!questionnaire) {
-      throw new HttpError(404, "Опросник не найден.");
-    }
-
-    const now = new Date().toISOString();
-    const run: QuestionnaireRun = {
-      id: createId("run"),
-      questionnaireId,
-      questionnaireVersionId: questionnaire.activeVersionId,
-      operatorId,
-      status: "draft",
-      currentQuestionId: null,
-      answers: {},
-      route: [],
-      messages: [],
-      verdicts: [],
-      summaryText: "",
-      startedAt: now,
-      updatedAt: now,
-      finishedAt: null,
-    };
-
-    storage.runs.push(run);
-
-    return run;
-  });
-}
-
-async function updateRunDraft(
-  runId: string,
-  userId: string,
-  role: UserRole,
-  payload: z.infer<typeof runPayloadSchema>,
-) {
-  return updateStorage((storage) => {
-    const run = getEditableRun(storage, runId, userId, role);
-
-    run.status = "draft";
-    run.currentQuestionId = payload.currentQuestionId ?? run.currentQuestionId;
-    run.answers = payload.answers;
-    run.route = payload.route;
-    run.messages = payload.messages;
-    run.verdicts = payload.verdicts;
-    run.summaryText = payload.summaryText;
-    run.updatedAt = new Date().toISOString();
-
-    return run;
-  });
-}
-
-async function finishRun(
-  runId: string,
-  userId: string,
-  role: UserRole,
-  payload: z.infer<typeof runPayloadSchema>,
-) {
-  return updateStorage((storage) => {
-    const run = getEditableRun(storage, runId, userId, role);
-    const now = new Date().toISOString();
-
-    run.status = "finished";
-    run.currentQuestionId = payload.currentQuestionId ?? null;
-    run.answers = payload.answers;
-    run.route = payload.route;
-    run.messages = payload.messages;
-    run.verdicts = payload.verdicts;
-    run.summaryText = payload.summaryText;
-    run.updatedAt = now;
-    run.finishedAt = now;
-
-    return run;
-  });
-}
-
-function getEditableRun(storage: AppStorage, runId: string, userId: string, role: UserRole): QuestionnaireRun {
-  const run = storage.runs.find((item) => item.id === runId);
-
-  if (!run) {
-    throw new HttpError(404, "Прохождение не найдено.");
-  }
-
-  if (role !== "admin" && run.operatorId !== userId) {
-    throw new HttpError(403, "Нет доступа к этому прохождению.");
-  }
-
-  return run;
 }

@@ -1,11 +1,12 @@
 # База данных и контейнеры
 
-Проект планируется запускать в трёх контейнерах:
+Проект планируется запускать в четырёх контейнерах:
 
 ```text
 frontend  - собранный web-интерфейс оператора
 backend   - сервер API
 db        - PostgreSQL
+pgadmin   - web-интерфейс управления PostgreSQL
 ```
 
 Backend работает с PostgreSQL через переменную `DATABASE_URL`. Файловое хранилище больше не используется в рабочем пути приложения.
@@ -23,25 +24,32 @@ Frontend: http://localhost:5173
 Backend:  http://localhost:4100
 Документация API: http://localhost:4100/api/docs
 PostgreSQL: localhost:5432
+pgAdmin: http://localhost:5050
 ```
 
-Backend ждёт готовности контейнера `db`, применяет миграции и затем запускает API.
+Backend ждёт готовности контейнера `db`, применяет Prisma-миграции и затем запускает API.
 
 ## Миграции
+
+Основная схема базы описана в файле:
+
+```text
+prisma/schema.prisma
+```
 
 Миграции лежат в папке:
 
 ```text
-db/migrations
+prisma/migrations
 ```
 
 Правила:
 
-- каждый файл миграции имеет номер и понятное имя;
-- миграции применяются по порядку имени файла;
-- применённые миграции записываются в таблицу `schema_migrations`;
-- каждая миграция выполняется в транзакции;
-- уже применённые миграции не выполняются повторно.
+- структуру таблиц меняем сначала в `prisma/schema.prisma`;
+- файл миграции создаём командой Prisma, а не вручную с нуля;
+- применённые миграции Prisma записывает в таблицу `_prisma_migrations`;
+- уже применённые миграции не редактируем, для следующих изменений создаём новый файл;
+- backend автоматически применяет новые миграции перед запуском API.
 
 Локальный запуск миграций:
 
@@ -51,6 +59,12 @@ $env:DATABASE_URL="postgresql://questionnaire:change-me@localhost:5432/questionn
 npm run migrate
 ```
 
+Создать новую миграцию:
+
+```powershell
+npm run db:migration:create -- --name add_short_description
+```
+
 ## Основные сущности
 
 - `users` - пользователи системы.
@@ -58,7 +72,7 @@ npm run migrate
 - `questionnaire_versions` - версии JSON-сценариев, импортированные из 1С.
 - `questionnaire_runs` - прохождения опросника оператором.
 - `audit_log` - журнал важных действий.
-- `schema_migrations` - служебная таблица применённых миграций.
+- `_prisma_migrations` - служебная таблица применённых Prisma-миграций.
 
 ## Роли
 
@@ -94,28 +108,33 @@ create table questionnaire_run_answers (
 );
 ```
 
-## Текущая миграция
+## Текущие миграции
 
-Первая миграция находится в файле:
+Базовая Prisma-миграция находится в файле:
 
 ```text
-db/migrations/001_initial_schema.sql
+prisma/migrations/00000000000000_baseline/migration.sql
 ```
 
 Она создаёт:
 
-- расширение `pgcrypto` для `gen_random_uuid()`;
 - типы `user_role` и `questionnaire_run_status`;
 - таблицы `users`, `questionnaires`, `questionnaire_versions`, `questionnaire_runs`, `audit_log`;
 - внешние ключи;
-- индексы для частых выборок.
+- индексы для частых выборок;
+- поля профиля пользователя: `email`, `phone`, `position`, `preferences_json`.
+
+Старые файлы `db/migrations/*.sql` оставлены как история перехода на PostgreSQL. Для новых изменений используем `prisma/schema.prisma` и `prisma/migrations`.
 
 ## Что уже подключено
 
 - контейнер PostgreSQL;
-- миграции в `db/migrations`;
+- контейнер pgAdmin;
+- Prisma-схема в `prisma/schema.prisma`;
+- миграции в `prisma/migrations`;
 - применение миграций перед запуском backend в Docker;
 - слой хранения backend через PostgreSQL;
 - автоматическое создание первого администратора при пустой таблице `users`.
-
-Дальше можно улучшать слой БД: заменить полную перезапись состояния на отдельные точечные запросы для пользователей, опросников и прохождений.
+- точечные запросы к БД вместо полной перезаписи состояния;
+- профиль пользователя и настройки интерфейса;
+- журнал важных действий в `audit_log`.
