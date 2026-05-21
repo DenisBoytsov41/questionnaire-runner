@@ -1,10 +1,8 @@
-create extension if not exists pgcrypto;
-
 create type user_role as enum ('user', 'operator', 'admin');
 create type questionnaire_run_status as enum ('draft', 'finished');
 
 create table users (
-  id uuid primary key default gen_random_uuid(),
+  id text primary key,
   login text not null unique,
   full_name text not null,
   role user_role not null default 'user',
@@ -18,21 +16,21 @@ create table users (
 create table questionnaires (
   id text primary key,
   title text not null,
-  active_version_id uuid null,
+  active_version_id text null,
   archived boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 create table questionnaire_versions (
-  id uuid primary key default gen_random_uuid(),
+  id text primary key,
   questionnaire_id text not null references questionnaires(id),
   version integer not null,
   title text not null,
   active boolean not null default true,
   published boolean not null default false,
   source_json jsonb not null,
-  imported_by uuid null references users(id),
+  imported_by text null references users(id),
   imported_at timestamptz not null default now(),
   unique (questionnaire_id, version)
 );
@@ -43,10 +41,10 @@ alter table questionnaires
   references questionnaire_versions(id);
 
 create table questionnaire_runs (
-  id uuid primary key default gen_random_uuid(),
+  id text primary key,
   questionnaire_id text not null references questionnaires(id),
-  questionnaire_version_id uuid not null references questionnaire_versions(id),
-  operator_id uuid null references users(id),
+  questionnaire_version_id text not null references questionnaire_versions(id),
+  operator_id text null references users(id),
   status questionnaire_run_status not null default 'draft',
   current_question_id text null,
   answers_json jsonb not null default '{}'::jsonb,
@@ -60,8 +58,8 @@ create table questionnaire_runs (
 );
 
 create table audit_log (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid null references users(id),
+  id text primary key,
+  user_id text null references users(id),
   action text not null,
   entity_type text not null,
   entity_id text null,
