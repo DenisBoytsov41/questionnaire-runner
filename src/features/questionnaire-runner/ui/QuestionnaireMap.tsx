@@ -16,6 +16,8 @@ interface QuestionnaireMapProps {
   answeredCount: number;
   startedAt: string;
   draftSavedAt: string;
+  serverSaveStatus?: "idle" | "saving" | "saved" | "error";
+  serverSavedAt?: string;
   onBack: () => void;
   onClearDraft: () => void;
   onNavigateToQuestion: (questionId: string) => void;
@@ -29,6 +31,8 @@ export function QuestionnaireMap({
   answeredCount,
   startedAt,
   draftSavedAt,
+  serverSaveStatus,
+  serverSavedAt,
   onBack,
   onClearDraft,
   onNavigateToQuestion,
@@ -113,6 +117,12 @@ export function QuestionnaireMap({
         >
           Очистить и начать заново
         </button>
+
+        {serverSaveStatus && (
+          <p className={`server-save-status ${serverSaveStatus}`}>
+            {formatServerSaveStatus(serverSaveStatus, serverSavedAt)}
+          </p>
+        )}
       </section>
 
       <section className="navigator-panel scenario-check-card" aria-label="Проверка сценария">
@@ -223,6 +233,25 @@ export function QuestionnaireMap({
       </details>
     </div>
   );
+}
+
+function formatServerSaveStatus(
+  status: NonNullable<QuestionnaireMapProps["serverSaveStatus"]>,
+  savedAt: string | undefined,
+): string {
+  if (status === "saving") {
+    return "Сохраняем в базе...";
+  }
+
+  if (status === "saved") {
+    return savedAt ? `Сохранено в базе: ${formatTime(savedAt)}` : "Сохранено в базе.";
+  }
+
+  if (status === "error") {
+    return "Не удалось сохранить в базе. Проверьте подключение.";
+  }
+
+  return "Сохранение в базе включено.";
 }
 
 function formatTime(value: string): string {

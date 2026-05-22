@@ -1,17 +1,27 @@
 import { useEffect, useState } from "react";
+import { singleQuestionnaireSchema } from "./entities/questionnaire/schema";
 import type { Questionnaire } from "./entities/questionnaire/types";
+import { validateQuestionnaireContract } from "./entities/questionnaire/validation";
 import { JsonUploadPage } from "./pages/JsonUploadPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ProfilePanel } from "./pages/ProfilePanel";
 import { QuestionnaireRunPage } from "./pages/QuestionnaireRunPage";
 import { QuestionnaireSelectPage } from "./pages/QuestionnaireSelectPage";
-import type { CurrentUser, UpdateProfileInput, UserPreferences } from "./shared/api/backendApi";
+import { ScenarioCatalogPage } from "./pages/ScenarioCatalogPage";
+import type {
+  CurrentUser,
+  PublishedQuestionnaire,
+  UpdateProfileInput,
+  UserPreferences,
+} from "./shared/api/backendApi";
 import {
+  createQuestionnaireRun,
   defaultUserPreferences,
   loadCurrentUser,
+  loadPublishedQuestionnaire,
+  loadPublishedQuestionnaires,
   updateCurrentUserProfile,
 } from "./shared/api/backendApi";
-import { loadQuestionnaireFromPublic } from "./shared/api/questionnaireApi";
 import { BrandHeader, type SettingsStatus } from "./shared/ui/BrandHeader";
 import "./App.css";
 
@@ -24,14 +34,21 @@ function App() {
     readStoredToken() ? "checking" : "ready",
   );
   const [authError, setAuthError] = useState("");
+  const [publishedQuestionnaires, setPublishedQuestionnaires] = useState<PublishedQuestionnaire[]>([]);
+  const [catalogStatus, setCatalogStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [catalogError, setCatalogError] = useState("");
   const [questionnaires, setQuestionnaires] = useState<Questionnaire[]>([]);
-  const [selectedQuestionnaire, setSelectedQuestionnaire] =
-    useState<Questionnaire | null>(null);
+  const [selectedQuestionnaire, setSelectedQuestionnaire] = useState<Questionnaire | null>(null);
+  const [questionnaireSource, setQuestionnaireSource] = useState<"backend" | "file">("backend");
+  const [activeRunId, setActiveRunId] = useState("");
+  const [isManualUploadOpen, setIsManualUploadOpen] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [settingsStatus, setSettingsStatus] = useState<SettingsStatus>("idle");
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const activePreferences = currentUser?.preferences ?? defaultUserPreferences;
+  const currentUserId = currentUser?.id;
+  const currentUserRole = currentUser?.role;
 
   useEffect(() => {
     const root = document.documentElement;
@@ -79,35 +96,109 @@ function App() {
   }, [authToken]);
 
   useEffect(() => {
-    if (!currentUser || currentUser.role === "user") {
+    if (!authToken || !currentUserId || currentUserRole === "user") {
       return;
     }
 
-    loadQuestionnaireFromPublic("Чек-лист звонка по ККТ.json").then((result) => {
-      if (result.ok) {
-        setQuestionnaires(result.questionnaires);
-        setLoadError("");
+    let isCancelled = false;
 
-        if (result.questionnaires.length === 1) {
-          setSelectedQuestionnaire(result.questionnaires[0]);
+    loadPublishedQuestionnaires(authToken)
+      .then((items) => {
+        if (isCancelled) {
+          return;
         }
 
+        setPublishedQuestionnaires(items);
+        setCatalogStatus("ready");
+      })
+      .catch((error) => {
+        if (isCancelled) {
+          return;
+        }
+
+        setPublishedQuestionnaires([]);
+        setCatalogStatus("error");
+        setCatalogError(
+          error instanceof Error
+            ? error.message
+            : "Не удалось получить список опубликованных сценариев.",
+        );
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [authToken, currentUserId, currentUserRole]);
+
+  async function refreshPublishedQuestionnaires() {
+    if (!authToken) {
+      return;
+    }
+
+    setCatalogStatus("loading");
+    setCatalogError("");
+
+    try {
+      const items = await loadPublishedQuestionnaires(authToken);
+      setPublishedQuestionnaires(items);
+      setCatalogStatus("ready");
+    } catch (error) {
+      setPublishedQuestionnaires([]);
+      setCatalogStatus("error");
+      setCatalogError(
+        error instanceof Error
+          ? error.message
+          : "Не удалось получить список опубликованных сценариев.",
+      );
+    }
+  }
+
+  async function handlePublishedQuestionnaireSelect(questionnaire: PublishedQuestionnaire) {
+    if (!authToken) {
+      setCatalogError("Сессия завершена. Войдите заново.");
+      return;
+    }
+
+    setCatalogError("");
+    setCatalogStatus("loading");
+
+    try {
+      const details = await loadPublishedQuestionnaire(authToken, questionnaire.id);
+      const parsed = singleQuestionnaireSchema.safeParse(details.source);
+
+      if (!parsed.success) {
+        setCatalogStatus("ready");
+        setCatalogError("Сценарий получен из базы, но его структура не прошла проверку.");
         return;
       }
 
-      setLoadError(
-        [
-          "Тестовый файл public/questionnaires/Чек-лист звонка по ККТ.json не найден или содержит ошибки.",
-          "Можно загрузить файл сценария вручную.",
-          ...result.errors,
-        ].join("\n"),
-      );
-    });
-  }, [currentUser]);
+      const contractErrors = validateQuestionnaireContract(parsed.data);
+
+      if (contractErrors.length > 0) {
+        setCatalogStatus("ready");
+        setCatalogError(`Сценарий получен из базы, но содержит ошибки: ${contractErrors.join("; ")}`);
+        return;
+      }
+
+      const run = await createQuestionnaireRun(authToken, questionnaire.id);
+
+      setSelectedQuestionnaire(parsed.data);
+      setQuestionnaireSource("backend");
+      setActiveRunId(run.id);
+      setIsManualUploadOpen(false);
+      setQuestionnaires([]);
+      setCatalogStatus("ready");
+    } catch (error) {
+      setCatalogStatus("ready");
+      setCatalogError(error instanceof Error ? error.message : "Не удалось открыть выбранный сценарий.");
+    }
+  }
 
   function handleQuestionnairesLoaded(loadedQuestionnaires: Questionnaire[]) {
     setQuestionnaires(loadedQuestionnaires);
     setLoadError("");
+    setQuestionnaireSource("file");
+    setActiveRunId("");
 
     if (loadedQuestionnaires.length === 1) {
       setSelectedQuestionnaire(loadedQuestionnaires[0]);
@@ -121,6 +212,18 @@ function App() {
     setQuestionnaires([]);
     setSelectedQuestionnaire(null);
     setLoadError("");
+    setIsManualUploadOpen(false);
+    setQuestionnaireSource("backend");
+    setActiveRunId("");
+  }
+
+  function handleOpenManualUpload() {
+    setQuestionnaires([]);
+    setSelectedQuestionnaire(null);
+    setLoadError("");
+    setIsManualUploadOpen(true);
+    setQuestionnaireSource("file");
+    setActiveRunId("");
   }
 
   function handleLogin(token: string, user: CurrentUser) {
@@ -129,6 +232,8 @@ function App() {
     setCurrentUser(user);
     setAuthError("");
     setAuthStatus("ready");
+    setCatalogStatus("loading");
+    setCatalogError("");
   }
 
   function handleLogout() {
@@ -136,8 +241,12 @@ function App() {
     setAuthToken("");
     setCurrentUser(null);
     setAuthError("");
+    setPublishedQuestionnaires([]);
     setQuestionnaires([]);
     setSelectedQuestionnaire(null);
+    setActiveRunId("");
+    setIsManualUploadOpen(false);
+    setCatalogError("");
     setLoadError("");
     setIsProfileOpen(false);
   }
@@ -233,7 +342,19 @@ function App() {
       <>
         <QuestionnaireRunPage
           questionnaire={selectedQuestionnaire}
-          onResetQuestionnaire={() => setSelectedQuestionnaire(null)}
+          onResetQuestionnaire={() => {
+            setSelectedQuestionnaire(null);
+            setActiveRunId("");
+          }}
+          resetLabel={questionnaireSource === "backend" ? "К списку сценариев" : "Выбрать другой файл"}
+          backendRun={
+            questionnaireSource === "backend" && activeRunId
+              ? {
+                  token: authToken,
+                  runId: activeRunId,
+                }
+              : undefined
+          }
           {...sharedHeaderProps}
         />
         {isProfileOpen && (
@@ -253,7 +374,7 @@ function App() {
         <QuestionnaireSelectPage
           questionnaires={questionnaires}
           onSelectQuestionnaire={setSelectedQuestionnaire}
-          onReset={handleResetAll}
+          onReset={handleOpenManualUpload}
           {...sharedHeaderProps}
         />
         {isProfileOpen && (
@@ -268,18 +389,41 @@ function App() {
   }
 
   return (
-    <main className="app-shell">
-      {sharedHeaderProps && <BrandHeader subtitle="Загрузка сценария из 1С" {...sharedHeaderProps} />}
-
-      {loadError && (
-        <div className="notice-block">
-          {loadError.split("\n").map((line) => (
-            <p key={line}>{line}</p>
-          ))}
-        </div>
+    <>
+      {sharedHeaderProps && !isManualUploadOpen && (
+        <ScenarioCatalogPage
+          questionnaires={publishedQuestionnaires}
+          status={catalogStatus}
+          error={catalogError}
+          onSelectQuestionnaire={handlePublishedQuestionnaireSelect}
+          onRefresh={refreshPublishedQuestionnaires}
+          onOpenManualUpload={handleOpenManualUpload}
+          {...sharedHeaderProps}
+        />
       )}
 
-      <JsonUploadPage onQuestionnairesLoaded={handleQuestionnairesLoaded} />
+      {sharedHeaderProps && isManualUploadOpen && (
+        <main className="app-shell">
+          <BrandHeader
+            subtitle="Резервная загрузка сценария"
+            action={{
+              label: "К списку сценариев",
+              onClick: handleResetAll,
+            }}
+            {...sharedHeaderProps}
+          />
+
+          {loadError && (
+            <div className="notice-block">
+              {loadError.split("\n").map((line) => (
+                <p key={line}>{line}</p>
+              ))}
+            </div>
+          )}
+
+          <JsonUploadPage onQuestionnairesLoaded={handleQuestionnairesLoaded} />
+        </main>
+      )}
 
       {isProfileOpen && (
         <ProfilePanel
@@ -288,7 +432,7 @@ function App() {
           onSave={handleProfileSave}
         />
       )}
-    </main>
+    </>
   );
 }
 

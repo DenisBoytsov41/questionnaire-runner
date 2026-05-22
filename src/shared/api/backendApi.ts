@@ -43,6 +43,44 @@ export type UpdateProfileInput = Partial<{
   preferences: UserPreferences;
 }>;
 
+export type PublishedQuestionnaire = {
+  id: string;
+  title: string;
+  activeVersionId: string;
+  version: number;
+  importedAt: string;
+};
+
+export type PublishedQuestionnaireDetails = {
+  id: string;
+  title: string;
+  version: number;
+  source: unknown;
+};
+
+export type QuestionnaireRunStatus = "draft" | "finished";
+
+export type QuestionnaireRunPayload = {
+  currentQuestionId?: string | null;
+  answers: Record<string, string | string[] | boolean | number | null>;
+  route: string[];
+  messages: string[];
+  verdicts: string[];
+  summaryText: string;
+};
+
+export type QuestionnaireRun = QuestionnaireRunPayload & {
+  id: string;
+  questionnaireId: string;
+  questionnaireVersionId: string;
+  operatorId: string;
+  status: QuestionnaireRunStatus;
+  currentQuestionId: string | null;
+  startedAt: string;
+  updatedAt: string;
+  finishedAt: string | null;
+};
+
 type ApiErrorBody = {
   error?: string;
   details?: string[];
@@ -76,6 +114,69 @@ export async function updateCurrentUserProfile(
   });
 
   return result.user;
+}
+
+export async function loadPublishedQuestionnaires(token: string): Promise<PublishedQuestionnaire[]> {
+  const result = await apiRequest<{ questionnaires: PublishedQuestionnaire[] }>("/api/questionnaires", {
+    token,
+  });
+
+  return result.questionnaires;
+}
+
+export async function loadPublishedQuestionnaire(
+  token: string,
+  questionnaireId: string,
+): Promise<PublishedQuestionnaireDetails> {
+  const result = await apiRequest<{ questionnaire: PublishedQuestionnaireDetails }>(
+    `/api/questionnaires/${encodeURIComponent(questionnaireId)}`,
+    {
+      token,
+    },
+  );
+
+  return result.questionnaire;
+}
+
+export async function createQuestionnaireRun(
+  token: string,
+  questionnaireId: string,
+): Promise<QuestionnaireRun> {
+  const result = await apiRequest<{ run: QuestionnaireRun }>("/api/questionnaire-runs", {
+    method: "POST",
+    token,
+    body: JSON.stringify({ questionnaireId }),
+  });
+
+  return result.run;
+}
+
+export async function saveQuestionnaireRunDraft(
+  token: string,
+  runId: string,
+  payload: QuestionnaireRunPayload,
+): Promise<QuestionnaireRun> {
+  const result = await apiRequest<{ run: QuestionnaireRun }>(`/api/questionnaire-runs/${runId}/draft`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(payload),
+  });
+
+  return result.run;
+}
+
+export async function finishQuestionnaireRun(
+  token: string,
+  runId: string,
+  payload: QuestionnaireRunPayload,
+): Promise<QuestionnaireRun> {
+  const result = await apiRequest<{ run: QuestionnaireRun }>(`/api/questionnaire-runs/${runId}/finish`, {
+    method: "POST",
+    token,
+    body: JSON.stringify(payload),
+  });
+
+  return result.run;
 }
 
 async function apiRequest<TResponse>(

@@ -1,11 +1,16 @@
 import type { Questionnaire } from "../entities/questionnaire/types";
+import {
+  QuestionnaireRunner,
+  type QuestionnaireRunPersistence,
+} from "../features/questionnaire-runner/ui/QuestionnaireRunner";
 import type { CurrentUser, UserPreferences } from "../shared/api/backendApi";
-import { QuestionnaireRunner } from "../features/questionnaire-runner/ui/QuestionnaireRunner";
 import { BrandHeader, type SettingsStatus } from "../shared/ui/BrandHeader";
 
 interface QuestionnaireRunPageProps {
   questionnaire: Questionnaire;
   onResetQuestionnaire: () => void;
+  resetLabel?: string;
+  backendRun?: QuestionnaireRunPersistence;
   user: CurrentUser;
   settings: UserPreferences;
   settingsStatus: SettingsStatus;
@@ -17,6 +22,8 @@ interface QuestionnaireRunPageProps {
 export function QuestionnaireRunPage({
   questionnaire,
   onResetQuestionnaire,
+  resetLabel = "Выбрать другой сценарий",
+  backendRun,
   user,
   settings,
   settingsStatus,
@@ -29,7 +36,7 @@ export function QuestionnaireRunPage({
       <BrandHeader
         subtitle="Опросник первой линии"
         action={{
-          label: "Загрузить другой файл",
+          label: resetLabel,
           onClick: onResetQuestionnaire,
         }}
         user={user}
@@ -40,7 +47,7 @@ export function QuestionnaireRunPage({
         onLogout={onLogout}
       />
 
-      <QuestionnaireRunner questionnaire={questionnaire} />
+      <QuestionnaireRunner questionnaire={questionnaire} backendRun={backendRun} />
     </main>
   );
 }
