@@ -35,6 +35,9 @@ export interface UserPreferences {
   theme: "light" | "dark";
   textSize: "normal" | "large" | "xlarge";
   readingMode: "normal" | "high-contrast";
+  profileIcon: "person" | "headset" | "shield" | "star" | "check";
+  profileColor: "teal" | "mint" | "blue" | "amber" | "rose";
+  avatarImage: string;
 }
 
 export interface StoredQuestionnaireVersion {

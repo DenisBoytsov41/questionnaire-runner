@@ -23,6 +23,9 @@ const defaultPreferences: UserPreferences = {
   theme: "light",
   textSize: "normal",
   readingMode: "normal",
+  profileIcon: "person",
+  profileColor: "teal",
+  avatarImage: "",
 };
 
 export async function checkDatabase(): Promise<void> {
@@ -819,7 +822,34 @@ function normalizePreferences(value: unknown): UserPreferences {
     theme: record.theme === "dark" ? "dark" : "light",
     textSize: record.textSize === "large" || record.textSize === "xlarge" ? record.textSize : "normal",
     readingMode: record.readingMode === "high-contrast" ? "high-contrast" : "normal",
+    profileIcon: normalizeProfileIcon(record.profileIcon),
+    profileColor: normalizeProfileColor(record.profileColor),
+    avatarImage: normalizeAvatarImage(record.avatarImage),
   };
+}
+
+function normalizeProfileIcon(value: unknown): UserPreferences["profileIcon"] {
+  if (value === "headset" || value === "shield" || value === "star" || value === "check") {
+    return value;
+  }
+
+  return "person";
+}
+
+function normalizeProfileColor(value: unknown): UserPreferences["profileColor"] {
+  if (value === "mint" || value === "blue" || value === "amber" || value === "rose") {
+    return value;
+  }
+
+  return "teal";
+}
+
+function normalizeAvatarImage(value: unknown): string {
+  if (typeof value === "string" && value.startsWith("data:image/") && value.length <= 900_000) {
+    return value;
+  }
+
+  return "";
 }
 
 function toIso(value: Date | string): string {

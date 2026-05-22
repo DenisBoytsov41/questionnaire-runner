@@ -1,12 +1,19 @@
-import { useEffect, useMemo, useReducer, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import {
+  formatAnswerForSummary,
   getMainFlowQuestions,
+  getQuestionById,
   getSectionById,
 } from "../../../entities/questionnaire/helpers";
 import type {
   Questionnaire,
   QuestionAnswer,
 } from "../../../entities/questionnaire/types";
+import {
+  finishQuestionnaireRun,
+  saveQuestionnaireRunDraft,
+  type QuestionnaireRunPayload,
+} from "../../../shared/api/backendApi";
 import {
   clearRunnerDraft,
   createRunnerStateFromDraft,
@@ -24,11 +31,24 @@ import { SummaryPage } from "./SummaryPage";
 
 interface QuestionnaireRunnerProps {
   questionnaire: Questionnaire;
+  backendRun?: QuestionnaireRunPersistence;
 }
 
-export function QuestionnaireRunner({ questionnaire }: QuestionnaireRunnerProps) {
+export interface QuestionnaireRunPersistence {
+  token: string;
+  runId: string;
+}
+
+type ServerSaveStatus = "idle" | "saving" | "saved" | "error";
+
+export function QuestionnaireRunner({ questionnaire, backendRun }: QuestionnaireRunnerProps) {
   const [restoredDraftSavedAt] = useState(() => getRunnerDraftSavedAt(questionnaire));
   const [lastSavedAt, setLastSavedAt] = useState(restoredDraftSavedAt);
+  const [serverSavedAt, setServerSavedAt] = useState("");
+  const [serverSaveStatus, setServerSaveStatus] = useState<ServerSaveStatus>("idle");
+  const finishedRunIdsRef = useRef(new Set<string>());
+  const backendRunId = backendRun?.runId;
+  const backendToken = backendRun?.token;
   const [state, dispatch] = useReducer(
     runnerReducer,
     questionnaire,
@@ -61,6 +81,41 @@ export function QuestionnaireRunner({ questionnaire }: QuestionnaireRunnerProps)
 
     return () => window.clearTimeout(timeoutId);
   }, [questionnaire, state]);
+
+  useEffect(() => {
+    if (!backendRunId || !backendToken || !hasDraftContent(state)) {
+      return;
+    }
+
+    if (state.isFinished && finishedRunIdsRef.current.has(backendRunId)) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      const payload = buildRunPayload(state);
+
+      setServerSaveStatus("saving");
+
+      const request = state.isFinished
+        ? finishQuestionnaireRun(backendToken, backendRunId, payload)
+        : saveQuestionnaireRunDraft(backendToken, backendRunId, payload);
+
+      request
+        .then((run) => {
+          if (state.isFinished) {
+            finishedRunIdsRef.current.add(backendRunId);
+          }
+
+          setServerSavedAt(run.updatedAt);
+          setServerSaveStatus("saved");
+        })
+        .catch(() => {
+          setServerSaveStatus("error");
+        });
+    }, state.isFinished ? 0 : 700);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [backendRunId, backendToken, state]);
 
   function handleRestart() {
     clearRunnerDraft(questionnaire);
@@ -134,6 +189,8 @@ export function QuestionnaireRunner({ questionnaire }: QuestionnaireRunnerProps)
           answeredCount={Object.keys(state.answers).length}
           startedAt={state.startedAt}
           draftSavedAt={lastSavedAt}
+          serverSaveStatus={backendRun ? serverSaveStatus : undefined}
+          serverSavedAt={serverSavedAt}
           onBack={() => dispatch({ type: "BACK" })}
           onClearDraft={handleRestart}
           onNavigateToQuestion={(questionId) => {
@@ -148,4 +205,44 @@ export function QuestionnaireRunner({ questionnaire }: QuestionnaireRunnerProps)
       </aside>
     </div>
   );
+}
+
+function buildRunPayload(state: ReturnType<typeof createInitialRunnerState>): QuestionnaireRunPayload {
+  return {
+    currentQuestionId: state.currentQuestion?.id ?? null,
+    answers: state.answers,
+    route: state.history,
+    messages: state.messages.map((message) => message.text),
+    verdicts: state.verdicts.map((verdict) => verdict.text),
+    summaryText: buildSummaryTextForBackend(state),
+  };
+}
+
+function buildSummaryTextForBackend(state: ReturnType<typeof createInitialRunnerState>): string {
+  const lines = [`Итог обращения: ${state.questionnaire.title}`, ""];
+
+  if (state.messages.length > 0) {
+    lines.push("Что нужно учесть:");
+    state.messages.forEach((message) => lines.push(`- ${message.text}`));
+    lines.push("");
+  }
+
+  if (state.verdicts.length > 0) {
+    lines.push("Итоговые действия:");
+    state.verdicts.forEach((verdict) => lines.push(`- ${verdict.text}`));
+    lines.push("");
+  }
+
+  lines.push("Ответы по пройденному маршруту:");
+  state.history.forEach((questionId) => {
+    const question = getQuestionById(state.questionnaire, questionId);
+
+    if (!question || !Object.prototype.hasOwnProperty.call(state.answers, question.id)) {
+      return;
+    }
+
+    lines.push(`- ${question.title}: ${formatAnswerForSummary(question, state.answers[question.id])}`);
+  });
+
+  return lines.join("\n");
 }

@@ -154,6 +154,12 @@ const openApiDocument = {
           theme: { type: "string", enum: ["light", "dark"] },
           textSize: { type: "string", enum: ["normal", "large", "xlarge"] },
           readingMode: { type: "string", enum: ["normal", "high-contrast"] },
+          profileIcon: { type: "string", enum: ["person", "headset", "shield", "star", "check"] },
+          profileColor: { type: "string", enum: ["teal", "mint", "blue", "amber", "rose"] },
+          avatarImage: {
+            type: "string",
+            description: "Картинка профиля в формате data URL или пустая строка.",
+          },
         },
       },
       UpdateProfileRequest: {
