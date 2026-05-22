@@ -182,9 +182,19 @@ const openApiDocument = {
       UpdateUserRequest: {
         type: "object",
         required: ["role"],
+        description: "Запрос администратора для назначения роли и открытия или закрытия входа сотрудника.",
         properties: {
-          role: { type: "string", enum: ["user", "operator", "admin"] },
-          active: { type: "boolean" },
+          role: {
+            type: "string",
+            enum: ["user", "operator", "admin"],
+            description: "user - без доступа, operator - оператор, admin - администратор.",
+            example: "operator",
+          },
+          active: {
+            type: "boolean",
+            description: "true - вход открыт, false - вход временно закрыт.",
+            example: true,
+          },
         },
       },
       PublishQuestionnaireRequest: {
@@ -307,10 +317,38 @@ const openApiDocument = {
         tags: ["Пользователи"],
         security: [{ bearerAuth: [] }],
         summary: "Изменить роль или активность пользователя",
+        description: "Маршрут доступен только администратору. Используется для назначения роли: без доступа, оператор или администратор, а также для временного закрытия входа сотруднику.",
         parameters: [pathParameter("id", "Идентификатор пользователя")],
-        requestBody: jsonBody("#/components/schemas/UpdateUserRequest"),
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/UpdateUserRequest" },
+              examples: {
+                makeOperator: {
+                  summary: "Назначить оператором",
+                  value: { role: "operator", active: true },
+                },
+                makeAdmin: {
+                  summary: "Назначить администратором",
+                  value: { role: "admin", active: true },
+                },
+                removeAccess: {
+                  summary: "Оставить без доступа",
+                  value: { role: "user", active: true },
+                },
+                blockLogin: {
+                  summary: "Закрыть вход",
+                  value: { role: "operator", active: false },
+                },
+              },
+            },
+          },
+        },
         responses: {
           200: response("Пользователь обновлён", { user: { $ref: "#/components/schemas/User" } }),
+          401: errorResponse("Нужно войти"),
+          403: errorResponse("Недостаточно прав"),
           404: errorResponse("Пользователь не найден"),
         },
       },

@@ -1,11 +1,11 @@
 import type { Questionnaire } from "../entities/questionnaire/types";
 import type { CurrentUser, UserPreferences } from "../shared/api/backendApi";
-import { BrandHeader, type SettingsStatus } from "../shared/ui/BrandHeader";
+import { BrandHeader, type HeaderNavigationItem, type SettingsStatus } from "../shared/ui/BrandHeader";
 
 interface QuestionnaireSelectPageProps {
   questionnaires: Questionnaire[];
   onSelectQuestionnaire: (questionnaire: Questionnaire) => void;
-  onReset: () => void;
+  navigationItems?: HeaderNavigationItem[];
   user: CurrentUser;
   settings: UserPreferences;
   settingsStatus: SettingsStatus;
@@ -17,7 +17,7 @@ interface QuestionnaireSelectPageProps {
 export function QuestionnaireSelectPage({
   questionnaires,
   onSelectQuestionnaire,
-  onReset,
+  navigationItems,
   user,
   settings,
   settingsStatus,
@@ -29,10 +29,7 @@ export function QuestionnaireSelectPage({
     <main className="app-shell">
       <BrandHeader
         subtitle="Выбор сценария из файла"
-        action={{
-          label: "Загрузить другой файл",
-          onClick: onReset,
-        }}
+        navigationItems={navigationItems}
         user={user}
         settings={settings}
         settingsStatus={settingsStatus}

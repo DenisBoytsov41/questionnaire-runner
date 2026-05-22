@@ -4,13 +4,12 @@ import {
   type QuestionnaireRunPersistence,
 } from "../features/questionnaire-runner/ui/QuestionnaireRunner";
 import type { CurrentUser, UserPreferences } from "../shared/api/backendApi";
-import { BrandHeader, type SettingsStatus } from "../shared/ui/BrandHeader";
+import { BrandHeader, type HeaderNavigationItem, type SettingsStatus } from "../shared/ui/BrandHeader";
 
 interface QuestionnaireRunPageProps {
   questionnaire: Questionnaire;
-  onResetQuestionnaire: () => void;
-  resetLabel?: string;
   backendRun?: QuestionnaireRunPersistence;
+  navigationItems?: HeaderNavigationItem[];
   user: CurrentUser;
   settings: UserPreferences;
   settingsStatus: SettingsStatus;
@@ -21,9 +20,8 @@ interface QuestionnaireRunPageProps {
 
 export function QuestionnaireRunPage({
   questionnaire,
-  onResetQuestionnaire,
-  resetLabel = "Выбрать другой сценарий",
   backendRun,
+  navigationItems,
   user,
   settings,
   settingsStatus,
@@ -35,10 +33,7 @@ export function QuestionnaireRunPage({
     <main className="app-shell">
       <BrandHeader
         subtitle="Опросник первой линии"
-        action={{
-          label: resetLabel,
-          onClick: onResetQuestionnaire,
-        }}
+        navigationItems={navigationItems}
         user={user}
         settings={settings}
         settingsStatus={settingsStatus}

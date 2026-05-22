@@ -63,6 +63,49 @@ export function createInitialRunnerState(questionnaire: Questionnaire): RunnerSt
   };
 }
 
+export function createRunnerStateFromSnapshot(
+  questionnaire: Questionnaire,
+  snapshot: {
+    currentQuestionId: string | null;
+    answers: AnswersMap;
+    history: string[];
+    messages: string[];
+    verdicts: string[];
+    startedAt: string;
+    finishedAt: string | null;
+    isFinished: boolean;
+  },
+): RunnerState | null {
+  const currentQuestion = snapshot.currentQuestionId
+    ? questionnaire.questions.find((question) => question.id === snapshot.currentQuestionId) ?? null
+    : null;
+
+  if (!snapshot.isFinished && !currentQuestion) {
+    return null;
+  }
+
+  const fallbackQuestionId = snapshot.currentQuestionId ?? snapshot.history.at(-1) ?? "";
+
+  return {
+    questionnaire,
+    currentQuestion,
+    answers: snapshot.answers,
+    history: snapshot.history,
+    messages: snapshot.messages.map((text) => ({
+      questionId: fallbackQuestionId,
+      text,
+    })),
+    verdicts: snapshot.verdicts.map((text) => ({
+      questionId: fallbackQuestionId,
+      text,
+    })),
+    isFinished: snapshot.isFinished,
+    validationError: "",
+    startedAt: snapshot.startedAt,
+    finishedAt: snapshot.finishedAt,
+  };
+}
+
 export function runnerReducer(state: RunnerState, action: RunnerAction): RunnerState {
   if (action.type === "RESET") {
     return createInitialRunnerState(state.questionnaire);

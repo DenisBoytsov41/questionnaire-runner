@@ -30,6 +30,8 @@ export type CurrentUser = {
   preferences: UserPreferences;
 };
 
+export type AdminUser = CurrentUser;
+
 export type LoginResult = {
   token: string;
   user: CurrentUser;
@@ -42,6 +44,11 @@ export type UpdateProfileInput = Partial<{
   position: string;
   preferences: UserPreferences;
 }>;
+
+export type UpdateUserAccessInput = {
+  role: UserRole;
+  active: boolean;
+};
 
 export type PublishedQuestionnaire = {
   id: string;
@@ -116,6 +123,28 @@ export async function updateCurrentUserProfile(
   return result.user;
 }
 
+export async function loadUsers(token: string): Promise<AdminUser[]> {
+  const result = await apiRequest<{ users: AdminUser[] }>("/api/users", {
+    token,
+  });
+
+  return result.users;
+}
+
+export async function updateUserAccess(
+  token: string,
+  userId: string,
+  input: UpdateUserAccessInput,
+): Promise<AdminUser> {
+  const result = await apiRequest<{ user: AdminUser }>(`/api/users/${encodeURIComponent(userId)}`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(input),
+  });
+
+  return result.user;
+}
+
 export async function loadPublishedQuestionnaires(token: string): Promise<PublishedQuestionnaire[]> {
   const result = await apiRequest<{ questionnaires: PublishedQuestionnaire[] }>("/api/questionnaires", {
     token,
@@ -147,6 +176,25 @@ export async function createQuestionnaireRun(
     token,
     body: JSON.stringify({ questionnaireId }),
   });
+
+  return result.run;
+}
+
+export async function loadQuestionnaireRuns(token: string): Promise<QuestionnaireRun[]> {
+  const result = await apiRequest<{ runs: QuestionnaireRun[] }>("/api/questionnaire-runs", {
+    token,
+  });
+
+  return result.runs;
+}
+
+export async function loadQuestionnaireRun(token: string, runId: string): Promise<QuestionnaireRun> {
+  const result = await apiRequest<{ run: QuestionnaireRun }>(
+    `/api/questionnaire-runs/${encodeURIComponent(runId)}`,
+    {
+      token,
+    },
+  );
 
   return result.run;
 }

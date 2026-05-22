@@ -1,5 +1,5 @@
 import type { CurrentUser, PublishedQuestionnaire, UserPreferences } from "../shared/api/backendApi";
-import { BrandHeader, type SettingsStatus } from "../shared/ui/BrandHeader";
+import { BrandHeader, type HeaderNavigationItem, type SettingsStatus } from "../shared/ui/BrandHeader";
 
 interface ScenarioCatalogPageProps {
   questionnaires: PublishedQuestionnaire[];
@@ -8,6 +8,9 @@ interface ScenarioCatalogPageProps {
   onSelectQuestionnaire: (questionnaire: PublishedQuestionnaire) => void;
   onRefresh: () => void;
   onOpenManualUpload: () => void;
+  onOpenRuns: () => void;
+  onOpenAdminUsers: () => void;
+  navigationItems?: HeaderNavigationItem[];
   user: CurrentUser;
   settings: UserPreferences;
   settingsStatus: SettingsStatus;
@@ -23,6 +26,9 @@ export function ScenarioCatalogPage({
   onSelectQuestionnaire,
   onRefresh,
   onOpenManualUpload,
+  onOpenRuns,
+  onOpenAdminUsers,
+  navigationItems,
   user,
   settings,
   settingsStatus,
@@ -40,6 +46,7 @@ export function ScenarioCatalogPage({
           label: "Загрузить файл вручную",
           onClick: onOpenManualUpload,
         }}
+        navigationItems={navigationItems}
         user={user}
         settings={settings}
         settingsStatus={settingsStatus}
@@ -54,14 +61,16 @@ export function ScenarioCatalogPage({
             <p className="page-kicker">Сценарии из базы</p>
             <h1>Выберите рабочий сценарий</h1>
             <p>
-              Здесь показаны опубликованные опросники из backend. Оператор запускает сценарий отсюда,
-              а ручная загрузка файла остаётся запасным вариантом.
+              Здесь показаны опубликованные опросники из базы. Оператор запускает сценарий отсюда,
+              а ручная загрузка файла остаётся запасным вариантом для проверки.
             </p>
           </div>
 
-          <button type="button" className="secondary-button" onClick={onRefresh} disabled={isLoading}>
-            {isLoading ? "Обновляем..." : "Обновить список"}
-          </button>
+          <div className="scenario-catalog-actions">
+            <button type="button" className="secondary-button" onClick={onRefresh} disabled={isLoading}>
+              {isLoading ? "Обновляем..." : "Обновить список"}
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -74,7 +83,7 @@ export function ScenarioCatalogPage({
           <div className="scenario-empty-card">
             <p className="page-kicker">Загрузка</p>
             <h2>Получаем сценарии</h2>
-            <p>Проверяем опубликованные опросники и подготовим список для запуска.</p>
+            <p>Проверяем опубликованные опросники и готовим список для запуска.</p>
           </div>
         )}
 
@@ -83,8 +92,8 @@ export function ScenarioCatalogPage({
             <p className="page-kicker">Сценариев пока нет</p>
             <h2>В базе нет опубликованных опросников</h2>
             <p>
-              Администратор может загрузить JSON из 1С в backend и опубликовать версию. Если нужно
-              проверить сценарий прямо сейчас, используйте ручную загрузку файла.
+              Администратор может загрузить JSON из 1С в серверную часть и опубликовать версию.
+              Если нужно проверить сценарий прямо сейчас, используйте ручную загрузку файла.
             </p>
 
             <div className="scenario-empty-actions">
@@ -94,6 +103,14 @@ export function ScenarioCatalogPage({
               <button type="button" className="secondary-button" onClick={onRefresh}>
                 Проверить ещё раз
               </button>
+              <button type="button" className="secondary-button" onClick={onOpenRuns}>
+                Мои прохождения
+              </button>
+              {user.role === "admin" && (
+                <button type="button" className="secondary-button" onClick={onOpenAdminUsers}>
+                  Пользователи
+                </button>
+              )}
             </div>
           </div>
         )}

@@ -12,6 +12,7 @@ import type {
 import {
   finishQuestionnaireRun,
   saveQuestionnaireRunDraft,
+  type QuestionnaireRun,
   type QuestionnaireRunPayload,
 } from "../../../shared/api/backendApi";
 import {
@@ -23,6 +24,7 @@ import {
 } from "../lib/draftStorage";
 import {
   createInitialRunnerState,
+  createRunnerStateFromSnapshot,
   runnerReducer,
 } from "../model/reducer";
 import { QuestionCard } from "./QuestionCard";
@@ -37,12 +39,15 @@ interface QuestionnaireRunnerProps {
 export interface QuestionnaireRunPersistence {
   token: string;
   runId: string;
+  initialRun?: QuestionnaireRun;
 }
 
 type ServerSaveStatus = "idle" | "saving" | "saved" | "error";
 
 export function QuestionnaireRunner({ questionnaire, backendRun }: QuestionnaireRunnerProps) {
-  const [restoredDraftSavedAt] = useState(() => getRunnerDraftSavedAt(questionnaire));
+  const [restoredDraftSavedAt] = useState(() =>
+    backendRun?.initialRun?.updatedAt ?? getRunnerDraftSavedAt(questionnaire),
+  );
   const [lastSavedAt, setLastSavedAt] = useState(restoredDraftSavedAt);
   const [serverSavedAt, setServerSavedAt] = useState("");
   const [serverSaveStatus, setServerSaveStatus] = useState<ServerSaveStatus>("idle");
@@ -53,7 +58,18 @@ export function QuestionnaireRunner({ questionnaire, backendRun }: Questionnaire
     runnerReducer,
     questionnaire,
     (initialQuestionnaire) => (
-      createRunnerStateFromDraft(initialQuestionnaire) ?? createInitialRunnerState(initialQuestionnaire)
+      backendRun?.initialRun
+        ? createRunnerStateFromSnapshot(initialQuestionnaire, {
+            currentQuestionId: backendRun.initialRun.currentQuestionId,
+            answers: backendRun.initialRun.answers,
+            history: backendRun.initialRun.route,
+            messages: backendRun.initialRun.messages,
+            verdicts: backendRun.initialRun.verdicts,
+            startedAt: backendRun.initialRun.startedAt,
+            finishedAt: backendRun.initialRun.finishedAt,
+            isFinished: backendRun.initialRun.status === "finished",
+          }) ?? createInitialRunnerState(initialQuestionnaire)
+        : createRunnerStateFromDraft(initialQuestionnaire) ?? createInitialRunnerState(initialQuestionnaire)
     ),
   );
 

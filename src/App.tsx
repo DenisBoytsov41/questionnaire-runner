@@ -2,17 +2,22 @@ import { useEffect, useState } from "react";
 import { singleQuestionnaireSchema } from "./entities/questionnaire/schema";
 import type { Questionnaire } from "./entities/questionnaire/types";
 import { validateQuestionnaireContract } from "./entities/questionnaire/validation";
+import { AdminUsersPage } from "./pages/AdminUsersPage";
 import { JsonUploadPage } from "./pages/JsonUploadPage";
 import { LoginPage } from "./pages/LoginPage";
+import { MyRunsPage } from "./pages/MyRunsPage";
 import { ProfilePanel } from "./pages/ProfilePanel";
 import { QuestionnaireRunPage } from "./pages/QuestionnaireRunPage";
 import { QuestionnaireSelectPage } from "./pages/QuestionnaireSelectPage";
 import { ScenarioCatalogPage } from "./pages/ScenarioCatalogPage";
 import type {
   CurrentUser,
+  AdminUser,
   PublishedQuestionnaire,
+  QuestionnaireRun,
   UpdateProfileInput,
   UserPreferences,
+  UserRole,
 } from "./shared/api/backendApi";
 import {
   createQuestionnaireRun,
@@ -20,7 +25,10 @@ import {
   loadCurrentUser,
   loadPublishedQuestionnaire,
   loadPublishedQuestionnaires,
+  loadQuestionnaireRuns,
+  loadUsers,
   updateCurrentUserProfile,
+  updateUserAccess,
 } from "./shared/api/backendApi";
 import { BrandHeader, type SettingsStatus } from "./shared/ui/BrandHeader";
 import "./App.css";
@@ -37,11 +45,20 @@ function App() {
   const [publishedQuestionnaires, setPublishedQuestionnaires] = useState<PublishedQuestionnaire[]>([]);
   const [catalogStatus, setCatalogStatus] = useState<"loading" | "ready" | "error">("loading");
   const [catalogError, setCatalogError] = useState("");
+  const [runs, setRuns] = useState<QuestionnaireRun[]>([]);
+  const [runsStatus, setRunsStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [runsError, setRunsError] = useState("");
+  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
+  const [adminUsersStatus, setAdminUsersStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [adminUsersError, setAdminUsersError] = useState("");
   const [questionnaires, setQuestionnaires] = useState<Questionnaire[]>([]);
   const [selectedQuestionnaire, setSelectedQuestionnaire] = useState<Questionnaire | null>(null);
   const [questionnaireSource, setQuestionnaireSource] = useState<"backend" | "file">("backend");
   const [activeRunId, setActiveRunId] = useState("");
+  const [activeRunSnapshot, setActiveRunSnapshot] = useState<QuestionnaireRun | null>(null);
   const [isManualUploadOpen, setIsManualUploadOpen] = useState(false);
+  const [isRunsPageOpen, setIsRunsPageOpen] = useState(false);
+  const [isAdminUsersPageOpen, setIsAdminUsersPageOpen] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [settingsStatus, setSettingsStatus] = useState<SettingsStatus>("idle");
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -153,6 +170,87 @@ function App() {
     }
   }
 
+  async function refreshRuns() {
+    if (!authToken) {
+      return;
+    }
+
+    setRunsStatus("loading");
+    setRunsError("");
+
+    try {
+      const items = await loadQuestionnaireRuns(authToken);
+      setRuns(items);
+      setRunsStatus("ready");
+    } catch (error) {
+      setRuns([]);
+      setRunsStatus("error");
+      setRunsError(error instanceof Error ? error.message : "Не удалось получить список прохождений.");
+    }
+  }
+
+  async function refreshAdminUsers() {
+    if (!authToken || currentUserRole !== "admin") {
+      return;
+    }
+
+    setAdminUsersStatus("loading");
+    setAdminUsersError("");
+
+    try {
+      const items = await loadUsers(authToken);
+      setAdminUsers(items);
+      setAdminUsersStatus("ready");
+    } catch (error) {
+      setAdminUsers([]);
+      setAdminUsersStatus("error");
+      setAdminUsersError(error instanceof Error ? error.message : "Не удалось получить список пользователей.");
+    }
+  }
+
+  function handleOpenRunsPage() {
+    setIsRunsPageOpen(true);
+    setIsManualUploadOpen(false);
+    setIsAdminUsersPageOpen(false);
+    setSelectedQuestionnaire(null);
+    setActiveRunId("");
+    setActiveRunSnapshot(null);
+    void refreshRuns();
+  }
+
+  function handleOpenAdminUsersPage() {
+    setIsAdminUsersPageOpen(true);
+    setIsRunsPageOpen(false);
+    setIsManualUploadOpen(false);
+    setSelectedQuestionnaire(null);
+    setActiveRunId("");
+    setActiveRunSnapshot(null);
+    void refreshAdminUsers();
+  }
+
+  function handleBackToCatalog() {
+    setIsAdminUsersPageOpen(false);
+    setIsRunsPageOpen(false);
+    setIsManualUploadOpen(false);
+    setSelectedQuestionnaire(null);
+    setActiveRunId("");
+    setActiveRunSnapshot(null);
+  }
+
+  async function handleUpdateUserAccess(userId: string, input: { role: UserRole; active: boolean }) {
+    if (!authToken) {
+      throw new Error("Сессия завершена. Войдите заново.");
+    }
+
+    const updatedUser = await updateUserAccess(authToken, userId, input);
+
+    setAdminUsers((items) => items.map((item) => (item.id === updatedUser.id ? updatedUser : item)));
+
+    if (updatedUser.id === currentUser?.id) {
+      setCurrentUser(updatedUser);
+    }
+  }
+
   async function handlePublishedQuestionnaireSelect(questionnaire: PublishedQuestionnaire) {
     if (!authToken) {
       setCatalogError("Сессия завершена. Войдите заново.");
@@ -185,7 +283,10 @@ function App() {
       setSelectedQuestionnaire(parsed.data);
       setQuestionnaireSource("backend");
       setActiveRunId(run.id);
+      setActiveRunSnapshot(null);
       setIsManualUploadOpen(false);
+      setIsRunsPageOpen(false);
+      setIsAdminUsersPageOpen(false);
       setQuestionnaires([]);
       setCatalogStatus("ready");
     } catch (error) {
@@ -194,11 +295,61 @@ function App() {
     }
   }
 
+  async function handleContinueRun(run: QuestionnaireRun) {
+    if (!authToken) {
+      setRunsError("Сессия завершена. Войдите заново.");
+      return;
+    }
+
+    if (run.status !== "draft") {
+      setRunsError("Продолжить можно только незавершённый черновик.");
+      return;
+    }
+
+    setRunsStatus("loading");
+    setRunsError("");
+
+    try {
+      const details = await loadPublishedQuestionnaire(authToken, run.questionnaireId);
+      const parsed = singleQuestionnaireSchema.safeParse(details.source);
+
+      if (!parsed.success) {
+        setRunsStatus("ready");
+        setRunsError("Сценарий для черновика найден, но его структура не прошла проверку.");
+        return;
+      }
+
+      const contractErrors = validateQuestionnaireContract(parsed.data);
+
+      if (contractErrors.length > 0) {
+        setRunsStatus("ready");
+        setRunsError(`Сценарий для черновика содержит ошибки: ${contractErrors.join("; ")}`);
+        return;
+      }
+
+      setSelectedQuestionnaire(parsed.data);
+      setQuestionnaireSource("backend");
+      setActiveRunId(run.id);
+      setActiveRunSnapshot(run);
+      setIsManualUploadOpen(false);
+      setIsRunsPageOpen(false);
+      setIsAdminUsersPageOpen(false);
+      setQuestionnaires([]);
+      setRunsStatus("ready");
+    } catch (error) {
+      setRunsStatus("ready");
+      setRunsError(error instanceof Error ? error.message : "Не удалось продолжить черновик.");
+    }
+  }
+
   function handleQuestionnairesLoaded(loadedQuestionnaires: Questionnaire[]) {
     setQuestionnaires(loadedQuestionnaires);
     setLoadError("");
     setQuestionnaireSource("file");
     setActiveRunId("");
+    setActiveRunSnapshot(null);
+    setIsRunsPageOpen(false);
+    setIsAdminUsersPageOpen(false);
 
     if (loadedQuestionnaires.length === 1) {
       setSelectedQuestionnaire(loadedQuestionnaires[0]);
@@ -208,22 +359,16 @@ function App() {
     setSelectedQuestionnaire(null);
   }
 
-  function handleResetAll() {
-    setQuestionnaires([]);
-    setSelectedQuestionnaire(null);
-    setLoadError("");
-    setIsManualUploadOpen(false);
-    setQuestionnaireSource("backend");
-    setActiveRunId("");
-  }
-
   function handleOpenManualUpload() {
     setQuestionnaires([]);
     setSelectedQuestionnaire(null);
     setLoadError("");
     setIsManualUploadOpen(true);
+    setIsRunsPageOpen(false);
+    setIsAdminUsersPageOpen(false);
     setQuestionnaireSource("file");
     setActiveRunId("");
+    setActiveRunSnapshot(null);
   }
 
   function handleLogin(token: string, user: CurrentUser) {
@@ -242,11 +387,18 @@ function App() {
     setCurrentUser(null);
     setAuthError("");
     setPublishedQuestionnaires([]);
+    setRuns([]);
+    setAdminUsers([]);
     setQuestionnaires([]);
     setSelectedQuestionnaire(null);
     setActiveRunId("");
+    setActiveRunSnapshot(null);
     setIsManualUploadOpen(false);
+    setIsRunsPageOpen(false);
+    setIsAdminUsersPageOpen(false);
     setCatalogError("");
+    setRunsError("");
+    setAdminUsersError("");
     setLoadError("");
     setIsProfileOpen(false);
   }
@@ -285,6 +437,46 @@ function App() {
         user: currentUser,
         settings: activePreferences,
         settingsStatus,
+        navigationItems: [
+          ...(selectedQuestionnaire
+            ? [
+                {
+                  label: "Текущий опрос",
+                  description: "Продолжить открытый сценарий",
+                  active: true,
+                  onClick: () => undefined,
+                },
+              ]
+            : []),
+          {
+            label: "Сценарии",
+            description: "Выбор рабочего сценария",
+            active: !selectedQuestionnaire && !isRunsPageOpen && !isAdminUsersPageOpen && !isManualUploadOpen,
+            onClick: handleBackToCatalog,
+          },
+          {
+            label: "Мои прохождения",
+            description: "Черновики и завершённые опросы",
+            active: isRunsPageOpen,
+            onClick: handleOpenRunsPage,
+          },
+          ...(currentUser.role === "admin"
+            ? [
+                {
+                  label: "Пользователи",
+                  description: "Роли и доступ сотрудников",
+                  active: isAdminUsersPageOpen,
+                  onClick: handleOpenAdminUsersPage,
+                },
+              ]
+            : []),
+          {
+            label: "Профиль",
+            description: "Контакты и личные настройки",
+            active: isProfileOpen,
+            onClick: () => setIsProfileOpen(true),
+          },
+        ],
         onSettingsChange: handlePreferencesChange,
         onOpenProfile: () => setIsProfileOpen(true),
         onLogout: handleLogout,
@@ -342,16 +534,12 @@ function App() {
       <>
         <QuestionnaireRunPage
           questionnaire={selectedQuestionnaire}
-          onResetQuestionnaire={() => {
-            setSelectedQuestionnaire(null);
-            setActiveRunId("");
-          }}
-          resetLabel={questionnaireSource === "backend" ? "К списку сценариев" : "Выбрать другой файл"}
           backendRun={
             questionnaireSource === "backend" && activeRunId
               ? {
                   token: authToken,
                   runId: activeRunId,
+                  initialRun: activeRunSnapshot ?? undefined,
                 }
               : undefined
           }
@@ -374,7 +562,52 @@ function App() {
         <QuestionnaireSelectPage
           questionnaires={questionnaires}
           onSelectQuestionnaire={setSelectedQuestionnaire}
-          onReset={handleOpenManualUpload}
+          {...sharedHeaderProps}
+        />
+        {isProfileOpen && (
+          <ProfilePanel
+            user={currentUser}
+            onClose={() => setIsProfileOpen(false)}
+            onSave={handleProfileSave}
+          />
+        )}
+      </>
+    );
+  }
+
+  if (isAdminUsersPageOpen && sharedHeaderProps) {
+    return (
+      <>
+        <AdminUsersPage
+          users={adminUsers}
+          status={adminUsersStatus}
+          error={adminUsersError}
+          onRefresh={refreshAdminUsers}
+          onUpdateUser={handleUpdateUserAccess}
+          {...sharedHeaderProps}
+        />
+        {isProfileOpen && (
+          <ProfilePanel
+            user={currentUser}
+            onClose={() => setIsProfileOpen(false)}
+            onSave={handleProfileSave}
+          />
+        )}
+      </>
+    );
+  }
+
+  if (isRunsPageOpen && sharedHeaderProps) {
+    return (
+      <>
+        <MyRunsPage
+          runs={runs}
+          questionnaires={publishedQuestionnaires}
+          status={runsStatus}
+          error={runsError}
+          onRefresh={refreshRuns}
+          onContinueRun={handleContinueRun}
+          onBackToCatalog={handleBackToCatalog}
           {...sharedHeaderProps}
         />
         {isProfileOpen && (
@@ -398,6 +631,8 @@ function App() {
           onSelectQuestionnaire={handlePublishedQuestionnaireSelect}
           onRefresh={refreshPublishedQuestionnaires}
           onOpenManualUpload={handleOpenManualUpload}
+          onOpenRuns={handleOpenRunsPage}
+          onOpenAdminUsers={handleOpenAdminUsersPage}
           {...sharedHeaderProps}
         />
       )}
@@ -406,10 +641,6 @@ function App() {
         <main className="app-shell">
           <BrandHeader
             subtitle="Резервная загрузка сценария"
-            action={{
-              label: "К списку сценариев",
-              onClick: handleResetAll,
-            }}
             {...sharedHeaderProps}
           />
 
