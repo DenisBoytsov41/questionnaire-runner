@@ -4,6 +4,18 @@ export type UserPreferences = {
   theme: "light" | "dark";
   textSize: "normal" | "large" | "xlarge";
   readingMode: "normal" | "high-contrast";
+  profileIcon: "person" | "headset" | "shield" | "star" | "check";
+  profileColor: "teal" | "mint" | "blue" | "amber" | "rose";
+  avatarImage: string;
+};
+
+export const defaultUserPreferences: UserPreferences = {
+  theme: "light",
+  textSize: "normal",
+  readingMode: "normal",
+  profileIcon: "person",
+  profileColor: "teal",
+  avatarImage: "",
 };
 
 export type CurrentUser = {
@@ -23,6 +35,14 @@ export type LoginResult = {
   user: CurrentUser;
 };
 
+export type UpdateProfileInput = Partial<{
+  fullName: string;
+  email: string;
+  phone: string;
+  position: string;
+  preferences: UserPreferences;
+}>;
+
 type ApiErrorBody = {
   error?: string;
   details?: string[];
@@ -40,6 +60,19 @@ export async function loginToBackend(login: string, password: string): Promise<L
 export async function loadCurrentUser(token: string): Promise<CurrentUser> {
   const result = await apiRequest<{ user: CurrentUser }>("/api/me", {
     token,
+  });
+
+  return result.user;
+}
+
+export async function updateCurrentUserProfile(
+  token: string,
+  input: UpdateProfileInput,
+): Promise<CurrentUser> {
+  const result = await apiRequest<{ user: CurrentUser }>("/api/me/profile", {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(input),
   });
 
   return result.user;
@@ -70,7 +103,7 @@ async function apiRequest<TResponse>(
       body: options.body,
     });
   } catch {
-    throw new Error("Не удалось подключиться к серверу. Проверьте, что backend запущен.");
+    throw new Error("Не удалось подключиться к серверу. Проверьте, что серверная часть запущена.");
   }
 
   if (!response.ok) {

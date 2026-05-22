@@ -1,12 +1,16 @@
 import type { Questionnaire } from "../entities/questionnaire/types";
-import type { CurrentUser } from "../shared/api/backendApi";
-import { BrandHeader } from "../shared/ui/BrandHeader";
+import type { CurrentUser, UserPreferences } from "../shared/api/backendApi";
+import { BrandHeader, type SettingsStatus } from "../shared/ui/BrandHeader";
 
 interface QuestionnaireSelectPageProps {
   questionnaires: Questionnaire[];
   onSelectQuestionnaire: (questionnaire: Questionnaire) => void;
   onReset: () => void;
   user: CurrentUser;
+  settings: UserPreferences;
+  settingsStatus: SettingsStatus;
+  onSettingsChange: (settings: UserPreferences) => void;
+  onOpenProfile: () => void;
   onLogout: () => void;
 }
 
@@ -15,6 +19,10 @@ export function QuestionnaireSelectPage({
   onSelectQuestionnaire,
   onReset,
   user,
+  settings,
+  settingsStatus,
+  onSettingsChange,
+  onOpenProfile,
   onLogout,
 }: QuestionnaireSelectPageProps) {
   return (
@@ -26,6 +34,10 @@ export function QuestionnaireSelectPage({
           onClick: onReset,
         }}
         user={user}
+        settings={settings}
+        settingsStatus={settingsStatus}
+        onSettingsChange={onSettingsChange}
+        onOpenProfile={onOpenProfile}
         onLogout={onLogout}
       />
 
@@ -34,8 +46,8 @@ export function QuestionnaireSelectPage({
           <p className="page-kicker">Выбор опросника</p>
           <h1>Выберите сценарий для запуска</h1>
           <p>
-            В загруженном файле найдено несколько опросников. Выберите нужный
-            сценарий, после чего откроется форма прохождения.
+            В загруженном файле найдено несколько опросников. Выберите нужный сценарий, после чего
+            откроется форма прохождения.
           </p>
         </div>
 

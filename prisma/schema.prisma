@@ -30,7 +30,7 @@ model User {
   position         String                 @default("")
   role             UserRole               @default(user)
   active           Boolean                @default(true)
-  preferencesJson  Json                   @default("{\"theme\":\"light\",\"textSize\":\"normal\",\"readingMode\":\"normal\"}") @map("preferences_json")
+  preferencesJson  Json                   @default("{\"theme\":\"light\",\"textSize\":\"normal\",\"readingMode\":\"normal\",\"profileIcon\":\"person\",\"profileColor\":\"teal\",\"avatarImage\":\"\"}") @map("preferences_json")
   passwordHash     String                 @map("password_hash")
   passwordSalt     String                 @map("password_salt")
   createdAt        DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)

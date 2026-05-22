@@ -30,7 +30,7 @@ html[data-text-scale="large"] {
   --ks-text-scale: 1.08;
 }
 
-html[data-text-scale="extra"] {
+html[data-text-scale="xlarge"] {
   --ks-text-scale: 1.18;
 }
 
@@ -52,7 +52,7 @@ html[data-theme="dark"] {
   --ks-page-bg: #071b19;
 }
 
-html[data-vision="easy"] {
+html[data-vision="high-contrast"] {
   --ks-ink: #001917;
   --ks-muted: #263d39;
   --ks-brand: #00766f;
@@ -61,7 +61,7 @@ html[data-vision="easy"] {
   --ks-line: #62aaa4;
 }
 
-html[data-theme="dark"][data-vision="easy"] {
+html[data-theme="dark"][data-vision="high-contrast"] {
   --ks-ink: #ffffff;
   --ks-muted: #d6ebe7;
   --ks-brand: #54fff0;

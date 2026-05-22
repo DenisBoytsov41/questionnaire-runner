@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import type { CurrentUser } from "../api/backendApi";
+import { defaultUserPreferences, type CurrentUser, type UserPreferences } from "../api/backendApi";
+
+export type SettingsStatus = "idle" | "saving" | "saved" | "error";
 
 interface BrandHeaderProps {
   subtitle: string;
@@ -8,63 +10,43 @@ interface BrandHeaderProps {
     onClick: () => void;
   };
   user?: CurrentUser;
+  settings: UserPreferences;
+  settingsStatus?: SettingsStatus;
+  onSettingsChange: (settings: UserPreferences) => void;
+  onOpenProfile: () => void;
   onLogout?: () => void;
 }
 
-type TextScale = "normal" | "large" | "extra";
-type ThemeMode = "light" | "dark";
-type VisionMode = "default" | "easy";
-
-type UiSettings = {
-  textScale: TextScale;
-  theme: ThemeMode;
-  visionMode: VisionMode;
-};
-
-const settingsStorageKey = "ks-questionnaire-view-settings";
-
-const defaultSettings: UiSettings = {
-  textScale: "normal",
-  theme: "light",
-  visionMode: "default",
-};
-
-const textScaleOptions: Array<{ value: TextScale; label: string }> = [
+const textSizeOptions: Array<{ value: UserPreferences["textSize"]; label: string }> = [
   { value: "normal", label: "Обычный" },
   { value: "large", label: "Крупнее" },
-  { value: "extra", label: "Очень крупный" },
+  { value: "xlarge", label: "Очень крупный" },
 ];
 
-const themeOptions: Array<{ value: ThemeMode; label: string }> = [
+const themeOptions: Array<{ value: UserPreferences["theme"]; label: string }> = [
   { value: "light", label: "Светлое" },
   { value: "dark", label: "Тёмное" },
 ];
 
-const visionOptions: Array<{ value: VisionMode; label: string }> = [
-  { value: "default", label: "Обычное" },
-  { value: "easy", label: "Повышенная читаемость" },
+const readingOptions: Array<{ value: UserPreferences["readingMode"]; label: string }> = [
+  { value: "normal", label: "Обычное" },
+  { value: "high-contrast", label: "Повышенная читаемость" },
 ];
 
-export function BrandHeader({ subtitle, action, user, onLogout }: BrandHeaderProps) {
-  const [settings, setSettings] = useState<UiSettings>(readSettings);
+export function BrandHeader({
+  subtitle,
+  action,
+  user,
+  settings,
+  settingsStatus = "idle",
+  onSettingsChange,
+  onOpenProfile,
+  onLogout,
+}: BrandHeaderProps) {
   const [isViewMenuOpen, setIsViewMenuOpen] = useState(false);
   const viewMenuRef = useRef<HTMLDivElement | null>(null);
-  const activeTextScale = textScaleOptions.find((option) => option.value === settings.textScale);
+  const activeTextSize = textSizeOptions.find((option) => option.value === settings.textSize);
   const activeTheme = themeOptions.find((option) => option.value === settings.theme);
-
-  useEffect(() => {
-    const root = document.documentElement;
-
-    root.dataset.textScale = settings.textScale;
-    root.dataset.theme = settings.theme;
-    root.dataset.vision = settings.visionMode;
-
-    try {
-      localStorage.setItem(settingsStorageKey, JSON.stringify(settings));
-    } catch {
-      // Настройки вида не критичны для прохождения опросника.
-    }
-  }, [settings]);
 
   useEffect(() => {
     if (!isViewMenuOpen) {
@@ -96,13 +78,17 @@ export function BrandHeader({ subtitle, action, user, onLogout }: BrandHeaderPro
     };
   }, [isViewMenuOpen]);
 
-  const updateSettings = (nextSettings: Partial<UiSettings>) => {
-    setSettings((currentSettings) => ({ ...currentSettings, ...nextSettings }));
+  const updateSettings = (nextSettings: Partial<UserPreferences>) => {
+    onSettingsChange({ ...settings, ...nextSettings });
   };
 
-  const resetSettings = () => {
-    setSettings(defaultSettings);
-  };
+  const settingsSummary = [
+    activeTextSize?.label ?? "Обычный",
+    activeTheme?.label.toLowerCase() ?? "светлое",
+    settings.readingMode === "high-contrast" ? "читаемость" : "",
+  ]
+    .filter(Boolean)
+    .join(", ");
 
   return (
     <div className="top-bar">
@@ -139,19 +125,16 @@ export function BrandHeader({ subtitle, action, user, onLogout }: BrandHeaderPro
             onClick={() => setIsViewMenuOpen((isOpen) => !isOpen)}
           >
             <span>Настройки вида</span>
-            <small>
-              {activeTextScale?.label}, {activeTheme?.label.toLowerCase()}
-              {settings.visionMode === "easy" ? ", читаемость" : ""}
-            </small>
+            <small>{settingsSummary}</small>
           </button>
 
           {isViewMenuOpen && (
             <div className="view-settings" aria-label="Настройки внешнего вида">
               <SettingButtons
                 label="Размер текста"
-                options={textScaleOptions}
-                value={settings.textScale}
-                onChange={(textScale) => updateSettings({ textScale })}
+                options={textSizeOptions}
+                value={settings.textSize}
+                onChange={(textSize) => updateSettings({ textSize })}
               />
 
               <SettingButtons
@@ -163,18 +146,26 @@ export function BrandHeader({ subtitle, action, user, onLogout }: BrandHeaderPro
 
               <SettingButtons
                 label="Чтение"
-                options={visionOptions}
-                value={settings.visionMode}
-                onChange={(visionMode) => updateSettings({ visionMode })}
+                options={readingOptions}
+                value={settings.readingMode}
+                onChange={(readingMode) => updateSettings({ readingMode })}
               />
 
               <div className="view-settings-footer">
-                <p>
-                  Пока настройки сохраняются только в этом браузере. После подключения входа перенесём их в профиль
-                  сотрудника.
-                </p>
+                <p>{getSettingsStatusText(settingsStatus)}</p>
 
-                <button type="button" className="secondary-button view-reset-button" onClick={resetSettings}>
+                <button
+                  type="button"
+                  className="secondary-button view-reset-button"
+                  onClick={() => {
+                    onSettingsChange({
+                      ...settings,
+                      theme: defaultUserPreferences.theme,
+                      textSize: defaultUserPreferences.textSize,
+                      readingMode: defaultUserPreferences.readingMode,
+                    });
+                  }}
+                >
                   Сбросить настройки вида
                 </button>
               </div>
@@ -183,11 +174,19 @@ export function BrandHeader({ subtitle, action, user, onLogout }: BrandHeaderPro
         </div>
 
         <div className="operator-profile" aria-label="Профиль сотрудника">
-          <span className="operator-avatar">ОП</span>
-          <span className="operator-profile-text">
-            <strong>{user?.fullName || "Сотрудник"}</strong>
-            <small>{getRoleLabel(user?.role)}</small>
-          </span>
+          <button type="button" className="operator-profile-main" onClick={onOpenProfile}>
+            <span className={`operator-avatar profile-color-${settings.profileColor}`}>
+              {settings.avatarImage ? (
+                <img src={settings.avatarImage} alt="" className="operator-avatar-image" />
+              ) : (
+                getProfileIconSymbol(settings.profileIcon, user)
+              )}
+            </span>
+            <span className="operator-profile-text">
+              <strong>{user?.fullName || "Сотрудник"}</strong>
+              <small>{getRoleLabel(user?.role)}</small>
+            </span>
+          </button>
 
           {onLogout && (
             <button type="button" className="operator-logout" onClick={onLogout}>
@@ -200,6 +199,22 @@ export function BrandHeader({ subtitle, action, user, onLogout }: BrandHeaderPro
   );
 }
 
+function getSettingsStatusText(status: SettingsStatus): string {
+  if (status === "saving") {
+    return "Сохраняем настройки в профиле сотрудника...";
+  }
+
+  if (status === "saved") {
+    return "Настройки сохранены в профиле сотрудника.";
+  }
+
+  if (status === "error") {
+    return "Не удалось сохранить настройки. Проверьте подключение к серверу.";
+  }
+
+  return "Настройки сохраняются в профиле сотрудника и применяются после входа.";
+}
+
 function getRoleLabel(role: CurrentUser["role"] | undefined): string {
   if (role === "admin") {
     return "Администратор";
@@ -210,6 +225,33 @@ function getRoleLabel(role: CurrentUser["role"] | undefined): string {
   }
 
   return "Без доступа";
+}
+
+function getProfileIconSymbol(
+  icon: UserPreferences["profileIcon"],
+  user: CurrentUser | undefined,
+): string {
+  if (icon === "headset") {
+    return "☎";
+  }
+
+  if (icon === "shield") {
+    return "◆";
+  }
+
+  if (icon === "star") {
+    return "★";
+  }
+
+  if (icon === "check") {
+    return "✓";
+  }
+
+  const source = user?.fullName || user?.login || "Сотрудник";
+  const parts = source.trim().split(/\s+/).filter(Boolean);
+  const initials = parts.slice(0, 2).map((part) => part[0]?.toUpperCase()).join("");
+
+  return initials || "С";
 }
 
 function SettingButtons<TValue extends string>({
@@ -241,36 +283,4 @@ function SettingButtons<TValue extends string>({
       </div>
     </div>
   );
-}
-
-function readSettings(): UiSettings {
-  try {
-    const rawSettings = localStorage.getItem(settingsStorageKey);
-
-    if (!rawSettings) {
-      return defaultSettings;
-    }
-
-    const parsedSettings = JSON.parse(rawSettings) as Partial<UiSettings>;
-
-    return {
-      textScale: isTextScale(parsedSettings.textScale) ? parsedSettings.textScale : "normal",
-      theme: isThemeMode(parsedSettings.theme) ? parsedSettings.theme : "light",
-      visionMode: isVisionMode(parsedSettings.visionMode) ? parsedSettings.visionMode : "default",
-    };
-  } catch {
-    return defaultSettings;
-  }
-}
-
-function isTextScale(value: unknown): value is TextScale {
-  return value === "normal" || value === "large" || value === "extra";
-}
-
-function isThemeMode(value: unknown): value is ThemeMode {
-  return value === "light" || value === "dark";
-}
-
-function isVisionMode(value: unknown): value is VisionMode {
-  return value === "default" || value === "easy";
 }

@@ -2,12 +2,17 @@ import { useEffect, useState } from "react";
 import type { Questionnaire } from "./entities/questionnaire/types";
 import { JsonUploadPage } from "./pages/JsonUploadPage";
 import { LoginPage } from "./pages/LoginPage";
+import { ProfilePanel } from "./pages/ProfilePanel";
 import { QuestionnaireRunPage } from "./pages/QuestionnaireRunPage";
 import { QuestionnaireSelectPage } from "./pages/QuestionnaireSelectPage";
-import type { CurrentUser } from "./shared/api/backendApi";
-import { loadCurrentUser } from "./shared/api/backendApi";
+import type { CurrentUser, UpdateProfileInput, UserPreferences } from "./shared/api/backendApi";
+import {
+  defaultUserPreferences,
+  loadCurrentUser,
+  updateCurrentUserProfile,
+} from "./shared/api/backendApi";
 import { loadQuestionnaireFromPublic } from "./shared/api/questionnaireApi";
-import { BrandHeader } from "./shared/ui/BrandHeader";
+import { BrandHeader, type SettingsStatus } from "./shared/ui/BrandHeader";
 import "./App.css";
 
 const authTokenStorageKey = "ks-questionnaire-auth-token";
@@ -23,6 +28,18 @@ function App() {
   const [selectedQuestionnaire, setSelectedQuestionnaire] =
     useState<Questionnaire | null>(null);
   const [loadError, setLoadError] = useState("");
+  const [settingsStatus, setSettingsStatus] = useState<SettingsStatus>("idle");
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  const activePreferences = currentUser?.preferences ?? defaultUserPreferences;
+
+  useEffect(() => {
+    const root = document.documentElement;
+
+    root.dataset.textScale = activePreferences.textSize;
+    root.dataset.theme = activePreferences.theme;
+    root.dataset.vision = activePreferences.readingMode;
+  }, [activePreferences]);
 
   useEffect(() => {
     if (!authToken) {
@@ -122,7 +139,48 @@ function App() {
     setQuestionnaires([]);
     setSelectedQuestionnaire(null);
     setLoadError("");
+    setIsProfileOpen(false);
   }
+
+  async function handlePreferencesChange(preferences: UserPreferences) {
+    if (!authToken || !currentUser) {
+      return;
+    }
+
+    const previousUser = currentUser;
+
+    setCurrentUser({ ...currentUser, preferences });
+    setSettingsStatus("saving");
+
+    try {
+      const updatedUser = await updateCurrentUserProfile(authToken, { preferences });
+      setCurrentUser(updatedUser);
+      setSettingsStatus("saved");
+    } catch {
+      setCurrentUser(previousUser);
+      setSettingsStatus("error");
+    }
+  }
+
+  async function handleProfileSave(input: UpdateProfileInput) {
+    if (!authToken) {
+      throw new Error("Сессия завершена. Войдите заново.");
+    }
+
+    const updatedUser = await updateCurrentUserProfile(authToken, input);
+    setCurrentUser(updatedUser);
+  }
+
+  const sharedHeaderProps = currentUser
+    ? {
+        user: currentUser,
+        settings: activePreferences,
+        settingsStatus,
+        onSettingsChange: handlePreferencesChange,
+        onOpenProfile: () => setIsProfileOpen(true),
+        onLogout: handleLogout,
+      }
+    : null;
 
   if (authStatus === "checking") {
     return (
@@ -139,60 +197,79 @@ function App() {
   }
 
   if (!currentUser) {
-    return (
-      <>
-        {authError && <div className="auth-top-error">{authError}</div>}
-        <LoginPage onLogin={handleLogin} />
-      </>
-    );
+    return <LoginPage onLogin={handleLogin} message={authError} />;
   }
 
-  if (currentUser.role === "user") {
+  if (currentUser.role === "user" && sharedHeaderProps) {
     return (
       <main className="app-shell">
-        <BrandHeader subtitle="Ожидает назначения доступа" user={currentUser} onLogout={handleLogout} />
+        <BrandHeader subtitle="Ожидает назначения доступа" {...sharedHeaderProps} />
 
         <section className="access-denied-card">
           <p className="page-kicker">Доступ пока не открыт</p>
           <h1>Учётная запись создана</h1>
           <p>
-            Администратор должен назначить вам роль оператора или администратора. После этого рабочие сценарии
-            появятся автоматически.
+            Администратор должен назначить вам роль оператора или администратора. После этого рабочие
+            сценарии появятся автоматически.
           </p>
           <button type="button" className="secondary-button" onClick={handleLogout}>
             Выйти
           </button>
         </section>
+
+        {isProfileOpen && (
+          <ProfilePanel
+            user={currentUser}
+            onClose={() => setIsProfileOpen(false)}
+            onSave={handleProfileSave}
+          />
+        )}
       </main>
     );
   }
 
-  if (selectedQuestionnaire) {
+  if (selectedQuestionnaire && sharedHeaderProps) {
     return (
-      <QuestionnaireRunPage
-        questionnaire={selectedQuestionnaire}
-        onResetQuestionnaire={() => setSelectedQuestionnaire(null)}
-        user={currentUser}
-        onLogout={handleLogout}
-      />
+      <>
+        <QuestionnaireRunPage
+          questionnaire={selectedQuestionnaire}
+          onResetQuestionnaire={() => setSelectedQuestionnaire(null)}
+          {...sharedHeaderProps}
+        />
+        {isProfileOpen && (
+          <ProfilePanel
+            user={currentUser}
+            onClose={() => setIsProfileOpen(false)}
+            onSave={handleProfileSave}
+          />
+        )}
+      </>
     );
   }
 
-  if (questionnaires.length > 1) {
+  if (questionnaires.length > 1 && sharedHeaderProps) {
     return (
-      <QuestionnaireSelectPage
-        questionnaires={questionnaires}
-        onSelectQuestionnaire={setSelectedQuestionnaire}
-        onReset={handleResetAll}
-        user={currentUser}
-        onLogout={handleLogout}
-      />
+      <>
+        <QuestionnaireSelectPage
+          questionnaires={questionnaires}
+          onSelectQuestionnaire={setSelectedQuestionnaire}
+          onReset={handleResetAll}
+          {...sharedHeaderProps}
+        />
+        {isProfileOpen && (
+          <ProfilePanel
+            user={currentUser}
+            onClose={() => setIsProfileOpen(false)}
+            onSave={handleProfileSave}
+          />
+        )}
+      </>
     );
   }
 
   return (
     <main className="app-shell">
-      <BrandHeader subtitle="Загрузка сценария из 1С" user={currentUser} onLogout={handleLogout} />
+      {sharedHeaderProps && <BrandHeader subtitle="Загрузка сценария из 1С" {...sharedHeaderProps} />}
 
       {loadError && (
         <div className="notice-block">
@@ -203,6 +280,14 @@ function App() {
       )}
 
       <JsonUploadPage onQuestionnairesLoaded={handleQuestionnairesLoaded} />
+
+      {isProfileOpen && (
+        <ProfilePanel
+          user={currentUser}
+          onClose={() => setIsProfileOpen(false)}
+          onSave={handleProfileSave}
+        />
+      )}
     </main>
   );
 }

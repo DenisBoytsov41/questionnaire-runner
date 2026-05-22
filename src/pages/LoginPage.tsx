@@ -5,9 +5,10 @@ import { loginToBackend } from "../shared/api/backendApi";
 
 interface LoginPageProps {
   onLogin: (token: string, user: CurrentUser) => void;
+  message?: string;
 }
 
-export function LoginPage({ onLogin }: LoginPageProps) {
+export function LoginPage({ onLogin, message }: LoginPageProps) {
   const [login, setLogin] = useState("admin");
   const [password, setPassword] = useState("admin123");
   const [error, setError] = useState("");
@@ -57,6 +58,8 @@ export function LoginPage({ onLogin }: LoginPageProps) {
         </div>
 
         <form className="login-form" onSubmit={handleSubmit}>
+          {message && <div className="login-message">{message}</div>}
+
           <label>
             <span>Логин</span>
             <input

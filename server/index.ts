@@ -67,6 +67,9 @@ const userPreferencesSchema = z.object({
   theme: z.enum(["light", "dark"]).default("light"),
   textSize: z.enum(["normal", "large", "xlarge"]).default("normal"),
   readingMode: z.enum(["normal", "high-contrast"]).default("normal"),
+  profileIcon: z.enum(["person", "headset", "shield", "star", "check"]).default("person"),
+  profileColor: z.enum(["teal", "mint", "blue", "amber", "rose"]).default("teal"),
+  avatarImage: z.string().max(900_000).default(""),
 });
 
 const updateProfileSchema = z.object({
