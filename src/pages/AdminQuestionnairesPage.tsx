@@ -1,18 +1,24 @@
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type {
   AdminQuestionnaire,
   CurrentUser,
   ImportQuestionnairesResult,
+  ListPageParams,
+  PaginationMeta,
   UserPreferences,
 } from "../shared/api/backendApi";
 import { parseQuestionnaireJsonText, readJsonFile } from "../shared/api/questionnaireApi";
 import { BrandHeader, type HeaderNavigationItem, type SettingsStatus } from "../shared/ui/BrandHeader";
+import { Pagination } from "../shared/ui/Pagination";
 
 interface AdminQuestionnairesPageProps {
   questionnaires: AdminQuestionnaire[];
+  pagination: PaginationMeta;
+  params: Required<Pick<ListPageParams, "page" | "pageSize" | "search">>;
   status: "loading" | "ready" | "error";
   error: string;
   onRefresh: () => void;
+  onParamsChange: (params: Partial<Required<Pick<ListPageParams, "page" | "pageSize" | "search">>>) => void;
   onImportJson: (input: unknown) => Promise<ImportQuestionnairesResult[]>;
   onPublishVersion: (questionnaireId: string, versionId: string) => Promise<void>;
   onOpenAsOperator: (questionnaireId: string) => Promise<void>;
@@ -27,9 +33,12 @@ interface AdminQuestionnairesPageProps {
 
 export function AdminQuestionnairesPage({
   questionnaires,
+  pagination,
+  params,
   status,
   error,
   onRefresh,
+  onParamsChange,
   onImportJson,
   onPublishVersion,
   onOpenAsOperator,
@@ -43,17 +52,13 @@ export function AdminQuestionnairesPage({
 }: AdminQuestionnairesPageProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [jsonText, setJsonText] = useState("");
-  const [searchText, setSearchText] = useState("");
+  const [expandedVersionsById, setExpandedVersionsById] = useState<Record<string, boolean>>({});
   const [localError, setLocalError] = useState("");
   const [imported, setImported] = useState<ImportQuestionnairesResult[]>([]);
   const [importStatus, setImportStatus] = useState<"idle" | "loading">("idle");
   const [publishingVersionId, setPublishingVersionId] = useState("");
   const [openingQuestionnaireId, setOpeningQuestionnaireId] = useState("");
   const isLoading = status === "loading";
-  const filteredQuestionnaires = useMemo(
-    () => filterQuestionnaires(questionnaires, searchText),
-    [questionnaires, searchText],
-  );
 
   async function importInput(input: unknown) {
     setImportStatus("loading");
@@ -154,7 +159,7 @@ export function AdminQuestionnairesPage({
           </div>
 
           <div className="admin-users-metrics">
-            <AdminMetric label="Сценариев" value={questionnaires.length} />
+            <AdminMetric label="Сценариев" value={pagination.totalItems} />
             <AdminMetric label="Версий" value={questionnaires.reduce((sum, item) => sum + item.versions.length, 0)} />
             <AdminMetric label="В работе" value={questionnaires.filter((item) => !item.archived).length} />
           </div>
@@ -240,8 +245,8 @@ export function AdminQuestionnairesPage({
             <span>Найти сценарий</span>
             <input
               type="search"
-              value={searchText}
-              onChange={(event) => setSearchText(event.target.value)}
+              value={params.search}
+              onChange={(event) => onParamsChange({ search: event.target.value })}
               placeholder="Название, код или номер версии"
             />
           </label>
@@ -259,7 +264,7 @@ export function AdminQuestionnairesPage({
           </div>
         )}
 
-        {!isLoading && filteredQuestionnaires.length === 0 && (
+        {!isLoading && questionnaires.length === 0 && (
           <div className="runs-empty-card">
             <p className="page-kicker">Пока пусто</p>
             <h2>Сценариев в базе нет</h2>
@@ -267,9 +272,16 @@ export function AdminQuestionnairesPage({
           </div>
         )}
 
-        {filteredQuestionnaires.length > 0 && (
+        {questionnaires.length > 0 && (
+          <>
           <div className="admin-questionnaire-list">
-            {filteredQuestionnaires.map((questionnaire) => (
+            {questionnaires.map((questionnaire) => {
+              const isVersionsExpanded = expandedVersionsById[questionnaire.id] ?? false;
+              const visibleVersions = isVersionsExpanded
+                ? questionnaire.versions
+                : questionnaire.versions.slice(0, 3);
+
+              return (
               <article key={questionnaire.id} className="admin-questionnaire-card">
                 <div className="admin-questionnaire-card-header">
                   <div>
@@ -305,7 +317,7 @@ export function AdminQuestionnairesPage({
                 </div>
 
                 <div className="admin-questionnaire-versions">
-                  {questionnaire.versions.map((version) => {
+                  {visibleVersions.map((version) => {
                     const isCurrent = version.id === questionnaire.activeVersionId;
                     const isPublishing = publishingVersionId === version.id;
 
@@ -330,10 +342,35 @@ export function AdminQuestionnairesPage({
                       </div>
                     );
                   })}
+                  {questionnaire.versions.length > 3 && (
+                    <button
+                      type="button"
+                      className="secondary-button admin-questionnaire-versions-toggle"
+                      onClick={() =>
+                        setExpandedVersionsById((current) => ({
+                          ...current,
+                          [questionnaire.id]: !isVersionsExpanded,
+                        }))
+                      }
+                    >
+                      {isVersionsExpanded ? "Свернуть версии" : `Показать все версии (${questionnaire.versions.length})`}
+                    </button>
+                  )}
                 </div>
               </article>
-            ))}
+              );
+            })}
           </div>
+          <Pagination
+            label="сценариев"
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            totalItems={pagination.totalItems}
+            totalPages={pagination.totalPages}
+            onPageChange={(page) => onParamsChange({ page })}
+            onPageSizeChange={(pageSize) => onParamsChange({ page: 1, pageSize })}
+          />
+          </>
         )}
       </section>
     </main>
@@ -347,26 +384,6 @@ function AdminMetric({ label, value }: { label: string; value: number }) {
       <strong>{value}</strong>
     </div>
   );
-}
-
-function filterQuestionnaires(questionnaires: AdminQuestionnaire[], searchText: string): AdminQuestionnaire[] {
-  const normalizedSearch = searchText.trim().toLowerCase();
-
-  if (!normalizedSearch) {
-    return questionnaires;
-  }
-
-  return questionnaires.filter((questionnaire) => {
-    const haystack = [
-      questionnaire.id,
-      questionnaire.title,
-      ...questionnaire.versions.map((version) => String(version.version)),
-    ]
-      .join(" ")
-      .toLowerCase();
-
-    return haystack.includes(normalizedSearch);
-  });
 }
 
 function formatDateTime(value: string): string {

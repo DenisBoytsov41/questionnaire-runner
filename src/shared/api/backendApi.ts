@@ -37,6 +37,26 @@ export type LoginResult = {
   user: CurrentUser;
 };
 
+export type PaginationMeta = {
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+};
+
+export type PaginatedList<T> = {
+  items: T[];
+  pagination: PaginationMeta;
+};
+
+export type ListPageParams = {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  role?: UserRole | "all";
+  status?: QuestionnaireRunStatus | "all";
+};
+
 export type UpdateProfileInput = Partial<{
   fullName: string;
   email: string;
@@ -178,12 +198,18 @@ export async function changeCurrentUserPassword(
   });
 }
 
-export async function loadUsers(token: string): Promise<AdminUser[]> {
-  const result = await apiRequest<{ users: AdminUser[] }>("/api/users", {
-    token,
-  });
+export async function loadUsersPage(
+  token: string,
+  params: ListPageParams = {},
+): Promise<PaginatedList<AdminUser>> {
+  const result = await apiRequest<{ users: AdminUser[]; pagination?: PaginationMeta }>(
+    `/api/users${buildListQuery(params)}`,
+    {
+      token,
+    },
+  );
 
-  return result.users;
+  return normalizePaginatedList(result.users, result.pagination);
 }
 
 export async function createAdminUser(
@@ -213,12 +239,18 @@ export async function updateUserAccess(
   return result.user;
 }
 
-export async function loadPublishedQuestionnaires(token: string): Promise<PublishedQuestionnaire[]> {
-  const result = await apiRequest<{ questionnaires: PublishedQuestionnaire[] }>("/api/questionnaires", {
+export async function loadPublishedQuestionnairesPage(
+  token: string,
+  params: ListPageParams = {},
+): Promise<PaginatedList<PublishedQuestionnaire>> {
+  const result = await apiRequest<{
+    questionnaires: PublishedQuestionnaire[];
+    pagination?: PaginationMeta;
+  }>(`/api/questionnaires${buildListQuery(params)}`, {
     token,
   });
 
-  return result.questionnaires;
+  return normalizePaginatedList(result.questionnaires, result.pagination);
 }
 
 export async function loadPublishedQuestionnaire(
@@ -235,12 +267,18 @@ export async function loadPublishedQuestionnaire(
   return result.questionnaire;
 }
 
-export async function loadAdminQuestionnaires(token: string): Promise<AdminQuestionnaire[]> {
-  const result = await apiRequest<{ questionnaires: AdminQuestionnaire[] }>("/api/admin/questionnaires", {
+export async function loadAdminQuestionnairesPage(
+  token: string,
+  params: ListPageParams = {},
+): Promise<PaginatedList<AdminQuestionnaire>> {
+  const result = await apiRequest<{
+    questionnaires: AdminQuestionnaire[];
+    pagination?: PaginationMeta;
+  }>(`/api/admin/questionnaires${buildListQuery(params)}`, {
     token,
   });
 
-  return result.questionnaires;
+  return normalizePaginatedList(result.questionnaires, result.pagination);
 }
 
 export async function importQuestionnairesToBackend(
@@ -284,12 +322,18 @@ export async function createQuestionnaireRun(
   return result.run;
 }
 
-export async function loadQuestionnaireRuns(token: string): Promise<QuestionnaireRun[]> {
-  const result = await apiRequest<{ runs: QuestionnaireRun[] }>("/api/questionnaire-runs", {
-    token,
-  });
+export async function loadQuestionnaireRunsPage(
+  token: string,
+  params: ListPageParams = {},
+): Promise<PaginatedList<QuestionnaireRun>> {
+  const result = await apiRequest<{ runs: QuestionnaireRun[]; pagination?: PaginationMeta }>(
+    `/api/questionnaire-runs${buildListQuery(params)}`,
+    {
+      token,
+    },
+  );
 
-  return result.runs;
+  return normalizePaginatedList(result.runs, result.pagination);
 }
 
 export async function loadQuestionnaireRun(token: string, runId: string): Promise<QuestionnaireRun> {
@@ -373,6 +417,47 @@ async function apiRequest<TResponse>(
   }
 
   return response.json() as Promise<TResponse>;
+}
+
+function buildListQuery(params: ListPageParams): string {
+  const query = new URLSearchParams();
+
+  if (params.page) {
+    query.set("page", String(params.page));
+  }
+
+  if (params.pageSize) {
+    query.set("pageSize", String(params.pageSize));
+  }
+
+  if (params.search?.trim()) {
+    query.set("search", params.search.trim());
+  }
+
+  if (params.role && params.role !== "all") {
+    query.set("role", params.role);
+  }
+
+  if (params.status && params.status !== "all") {
+    query.set("status", params.status);
+  }
+
+  const queryString = query.toString();
+
+  return queryString ? `?${queryString}` : "";
+}
+
+function normalizePaginatedList<T>(items: T[], pagination?: PaginationMeta): PaginatedList<T> {
+  return {
+    items,
+    pagination:
+      pagination ?? {
+        page: 1,
+        pageSize: Math.max(items.length, 1),
+        totalItems: items.length,
+        totalPages: 1,
+      },
+  };
 }
 
 async function readErrorBody(response: Response): Promise<ApiErrorBody> {

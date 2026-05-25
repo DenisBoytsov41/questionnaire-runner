@@ -1,18 +1,24 @@
 import { useMemo, useState } from "react";
 import type {
   CurrentUser,
+  ListPageParams,
+  PaginationMeta,
   PublishedQuestionnaire,
   QuestionnaireRun,
   UserPreferences,
 } from "../shared/api/backendApi";
 import { BrandHeader, type HeaderNavigationItem, type SettingsStatus } from "../shared/ui/BrandHeader";
+import { Pagination } from "../shared/ui/Pagination";
 
 interface MyRunsPageProps {
   runs: QuestionnaireRun[];
   questionnaires: PublishedQuestionnaire[];
+  pagination: PaginationMeta;
+  params: Required<Pick<ListPageParams, "page" | "pageSize" | "search" | "status">>;
   status: "loading" | "ready" | "error";
   error: string;
   onRefresh: () => void;
+  onParamsChange: (params: Partial<Required<Pick<ListPageParams, "page" | "pageSize" | "search" | "status">>>) => void;
   onContinueRun: (run: QuestionnaireRun) => void;
   onDeleteDraftRun: (run: QuestionnaireRun) => Promise<void>;
   onBackToCatalog: () => void;
@@ -28,9 +34,12 @@ interface MyRunsPageProps {
 export function MyRunsPage({
   runs,
   questionnaires,
+  pagination,
+  params,
   status,
   error,
   onRefresh,
+  onParamsChange,
   onContinueRun,
   onDeleteDraftRun,
   onBackToCatalog,
@@ -42,8 +51,6 @@ export function MyRunsPage({
   onOpenProfile,
   onLogout,
 }: MyRunsPageProps) {
-  const [statusFilter, setStatusFilter] = useState<"all" | QuestionnaireRun["status"]>("all");
-  const [searchText, setSearchText] = useState("");
   const [openedRunId, setOpenedRunId] = useState<string | null>(null);
   const [deletingRunId, setDeletingRunId] = useState("");
   const [localError, setLocalError] = useState("");
@@ -53,10 +60,6 @@ export function MyRunsPage({
   const questionnaireTitleById = useMemo(
     () => new Map(questionnaires.map((questionnaire) => [questionnaire.id, questionnaire.title])),
     [questionnaires],
-  );
-  const filteredRuns = useMemo(
-    () => filterRuns(runs, statusFilter, searchText, questionnaireTitleById),
-    [questionnaireTitleById, runs, searchText, statusFilter],
   );
   const isLoading = status === "loading";
 
@@ -85,7 +88,7 @@ export function MyRunsPage({
           </div>
 
           <div className="runs-hero-metrics">
-            <RunMetric label="Всего" value={runs.length} />
+            <RunMetric label="Всего" value={pagination.totalItems} />
             <RunMetric label="Черновики" value={runs.filter((run) => run.status === "draft").length} />
             <RunMetric label="Завершено" value={runs.filter((run) => run.status === "finished").length} />
           </div>
@@ -96,8 +99,8 @@ export function MyRunsPage({
             <span>Найти прохождение</span>
             <input
               type="search"
-              value={searchText}
-              onChange={(event) => setSearchText(event.target.value)}
+              value={params.search}
+              onChange={(event) => onParamsChange({ search: event.target.value })}
               placeholder="Название сценария, код или текст итога"
             />
           </label>
@@ -105,22 +108,22 @@ export function MyRunsPage({
           <div className="runs-filter-group" aria-label="Фильтр прохождений">
             <button
               type="button"
-              className={statusFilter === "all" ? "active" : ""}
-              onClick={() => setStatusFilter("all")}
+              className={params.status === "all" ? "active" : ""}
+              onClick={() => onParamsChange({ status: "all" })}
             >
               Все
             </button>
             <button
               type="button"
-              className={statusFilter === "draft" ? "active" : ""}
-              onClick={() => setStatusFilter("draft")}
+              className={params.status === "draft" ? "active" : ""}
+              onClick={() => onParamsChange({ status: "draft" })}
             >
               Черновики
             </button>
             <button
               type="button"
-              className={statusFilter === "finished" ? "active" : ""}
-              onClick={() => setStatusFilter("finished")}
+              className={params.status === "finished" ? "active" : ""}
+              onClick={() => onParamsChange({ status: "finished" })}
             >
               Завершённые
             </button>
@@ -145,7 +148,7 @@ export function MyRunsPage({
           </div>
         )}
 
-        {!isLoading && filteredRuns.length === 0 && (
+        {!isLoading && runs.length === 0 && (
           <div className="runs-empty-card">
             <p className="page-kicker">Пока пусто</p>
             <h2>Подходящих прохождений нет</h2>
@@ -156,9 +159,10 @@ export function MyRunsPage({
           </div>
         )}
 
-        {filteredRuns.length > 0 && (
-          <div className="runs-list">
-            {filteredRuns.map((run) => {
+        {runs.length > 0 && (
+          <>
+            <div className="runs-list">
+              {runs.map((run) => {
               const title = questionnaireTitleById.get(run.questionnaireId) ?? run.questionnaireId;
               const isOpened = openedRunId === run.id;
 
@@ -283,8 +287,18 @@ export function MyRunsPage({
                   )}
                 </article>
               );
-            })}
-          </div>
+              })}
+            </div>
+            <Pagination
+              label="прохождений"
+              page={pagination.page}
+              pageSize={pagination.pageSize}
+              totalItems={pagination.totalItems}
+              totalPages={pagination.totalPages}
+              onPageChange={(page) => onParamsChange({ page })}
+              onPageSizeChange={(pageSize) => onParamsChange({ page: 1, pageSize })}
+            />
+          </>
         )}
       </section>
     </main>
@@ -298,34 +312,6 @@ function RunMetric({ label, value }: { label: string; value: number }) {
       <strong>{value}</strong>
     </div>
   );
-}
-
-function filterRuns(
-  runs: QuestionnaireRun[],
-  statusFilter: "all" | QuestionnaireRun["status"],
-  searchText: string,
-  questionnaireTitleById: Map<string, string>,
-): QuestionnaireRun[] {
-  const normalizedSearch = searchText.trim().toLowerCase();
-
-  return runs.filter((run) => {
-    if (statusFilter !== "all" && run.status !== statusFilter) {
-      return false;
-    }
-
-    if (!normalizedSearch) {
-      return true;
-    }
-
-    const haystack = [
-      run.id,
-      run.questionnaireId,
-      questionnaireTitleById.get(run.questionnaireId) ?? "",
-      run.summaryText,
-    ].join(" ").toLowerCase();
-
-    return haystack.includes(normalizedSearch);
-  });
 }
 
 async function copyRunSummary(summaryText: string): Promise<string> {

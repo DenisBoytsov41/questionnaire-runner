@@ -44,6 +44,29 @@ const defaultPreferences: UserPreferences = {
   avatarImage: "",
 };
 
+const defaultPageSize = 10;
+const maxPageSize = 100;
+
+export interface PaginationInput {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  role?: UserRole | "all";
+  status?: QuestionnaireRun["status"] | "all";
+}
+
+export interface PaginationMeta {
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+}
+
+export interface PaginatedResult<T> {
+  items: T[];
+  pagination: PaginationMeta;
+}
+
 export async function checkDatabase(): Promise<void> {
   await ensureInitialAdmin();
   await pool.query("select 1");
@@ -72,6 +95,34 @@ export async function listUsers(): Promise<PublicUser[]> {
   const result = await pool.query<UserRow>(userSelectSql("order by created_at, login"));
 
   return result.rows.map(mapUser).map(toPublicUser);
+}
+
+export async function listUsersPage(input: PaginationInput = {}): Promise<PaginatedResult<PublicUser>> {
+  await ensureInitialAdmin();
+  const { page: requestedPage, pageSize, search } = sanitizePagination(input);
+  const params: unknown[] = [];
+  const conditions: string[] = [];
+
+  if (input.role && input.role !== "all") {
+    params.push(input.role);
+    conditions.push(`role = $${params.length}`);
+  }
+
+  addSearchCondition(conditions, params, ["login", "full_name", "email", "phone", "position"], search);
+
+  const whereSql = conditions.length ? `where ${conditions.join(" and ")}` : "";
+  const totalItems = await countRows(`select count(*)::int as count from users ${whereSql}`, params);
+  const pagination = buildPagination(totalItems, requestedPage, pageSize);
+  const pageParams = [...params, pagination.pageSize, (pagination.page - 1) * pagination.pageSize];
+  const result = await pool.query<UserRow>(
+    userSelectSql(` ${whereSql} order by created_at, login limit $${pageParams.length - 1} offset $${pageParams.length}`),
+    pageParams,
+  );
+
+  return {
+    items: result.rows.map(mapUser).map(toPublicUser),
+    pagination,
+  };
 }
 
 export async function createUser(input: {
@@ -425,6 +476,62 @@ export async function listQuestionnairesForAdmin() {
   });
 }
 
+export async function listQuestionnairesForAdminPage(input: PaginationInput = {}) {
+  await ensureInitialAdmin();
+  const { page: requestedPage, pageSize, search } = sanitizePagination(input);
+  const params: unknown[] = [];
+  const conditions: string[] = [];
+
+  addQuestionnaireSearchCondition(conditions, params, search);
+
+  const whereSql = conditions.length ? `where ${conditions.join(" and ")}` : "";
+  const totalItems = await countRows(`select count(*)::int as count from questionnaires ${whereSql}`, params);
+  const pagination = buildPagination(totalItems, requestedPage, pageSize);
+  const pageParams = [...params, pagination.pageSize, (pagination.page - 1) * pagination.pageSize];
+  const questionnairesResult = await pool.query<QuestionnaireRow>(
+    questionnaireSelectSql(` ${whereSql} order by updated_at desc, title limit $${pageParams.length - 1} offset $${pageParams.length}`),
+    pageParams,
+  );
+  const questionnaireIds = questionnairesResult.rows.map((row) => row.id);
+  const versionsResult = questionnaireIds.length
+    ? await pool.query<QuestionnaireVersionRow>(
+      versionSelectSql("where questionnaire_id = any($1::text[]) order by questionnaire_id, version desc"),
+      [questionnaireIds],
+    )
+    : { rows: [] as QuestionnaireVersionRow[] };
+  const versionsByQuestionnaire = new Map<string, StoredQuestionnaireVersion[]>();
+
+  for (const row of versionsResult.rows) {
+    const version = mapQuestionnaireVersion(row);
+    const versions = versionsByQuestionnaire.get(version.questionnaireId) ?? [];
+
+    versions.push(version);
+    versionsByQuestionnaire.set(version.questionnaireId, versions);
+  }
+
+  return {
+    items: questionnairesResult.rows.map((row) => {
+      const questionnaire = mapQuestionnaire(row);
+      const versions = versionsByQuestionnaire.get(questionnaire.id) ?? [];
+
+      return {
+        ...questionnaire,
+        versions: versions.map((version) => ({
+          id: version.id,
+          questionnaireId: version.questionnaireId,
+          version: version.version,
+          title: version.title,
+          active: version.active,
+          published: version.published,
+          importedBy: version.importedBy,
+          importedAt: version.importedAt,
+        })),
+      };
+    }),
+    pagination,
+  };
+}
+
 export async function listPublishedQuestionnaires() {
   await ensureInitialAdmin();
   const result = await pool.query<PublishedQuestionnaireRow>(`
@@ -447,6 +554,55 @@ export async function listPublishedQuestionnaires() {
     version: row.version,
     importedAt: toIso(row.imported_at),
   }));
+}
+
+export async function listPublishedQuestionnairesPage(input: PaginationInput = {}) {
+  await ensureInitialAdmin();
+  const { page: requestedPage, pageSize, search } = sanitizePagination(input);
+  const params: unknown[] = [];
+  const conditions = ["q.archived = false", "v.published = true"];
+
+  addSearchCondition(conditions, params, ["q.id", "q.title"], search, ["cast(v.version as text)"]);
+
+  const whereSql = `where ${conditions.join(" and ")}`;
+  const totalItems = await countRows(
+    `
+      select count(*)::int as count
+      from questionnaires q
+      join questionnaire_versions v on v.id = q.active_version_id
+      ${whereSql}
+    `,
+    params,
+  );
+  const pagination = buildPagination(totalItems, requestedPage, pageSize);
+  const pageParams = [...params, pagination.pageSize, (pagination.page - 1) * pagination.pageSize];
+  const result = await pool.query<PublishedQuestionnaireRow>(
+    `
+      select
+        q.id,
+        q.title,
+        q.active_version_id,
+        v.version,
+        v.imported_at
+      from questionnaires q
+      join questionnaire_versions v on v.id = q.active_version_id
+      ${whereSql}
+      order by q.title
+      limit $${pageParams.length - 1} offset $${pageParams.length}
+    `,
+    pageParams,
+  );
+
+  return {
+    items: result.rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      activeVersionId: row.active_version_id,
+      version: row.version,
+      importedAt: toIso(row.imported_at),
+    })),
+    pagination,
+  };
 }
 
 export async function getPublishedQuestionnaire(questionnaireId: string) {
@@ -541,6 +697,48 @@ export async function listRunsForUser(userId: string, role: UserRole): Promise<Q
     : await pool.query<QuestionnaireRunRow>(runSelectSql("where operator_id = $1 order by started_at desc"), [userId]);
 
   return result.rows.map(mapQuestionnaireRun);
+}
+
+export async function listRunsForUserPage(
+  userId: string,
+  role: UserRole,
+  input: PaginationInput = {},
+): Promise<PaginatedResult<QuestionnaireRun>> {
+  await ensureInitialAdmin();
+  const { page: requestedPage, pageSize, search } = sanitizePagination(input);
+  const params: unknown[] = [];
+  const conditions: string[] = [];
+
+  if (role !== "admin") {
+    params.push(userId);
+    conditions.push(`operator_id = $${params.length}`);
+  }
+
+  if (input.status && input.status !== "all") {
+    params.push(input.status);
+    conditions.push(`status = $${params.length}`);
+  }
+
+  addSearchCondition(
+    conditions,
+    params,
+    ["id", "questionnaire_id", "questionnaire_version_id", "coalesce(current_question_id, '')", "coalesce(summary_text, '')"],
+    search,
+  );
+
+  const whereSql = conditions.length ? `where ${conditions.join(" and ")}` : "";
+  const totalItems = await countRows(`select count(*)::int as count from questionnaire_runs ${whereSql}`, params);
+  const pagination = buildPagination(totalItems, requestedPage, pageSize);
+  const pageParams = [...params, pagination.pageSize, (pagination.page - 1) * pagination.pageSize];
+  const result = await pool.query<QuestionnaireRunRow>(
+    runSelectSql(` ${whereSql} order by started_at desc limit $${pageParams.length - 1} offset $${pageParams.length}`),
+    pageParams,
+  );
+
+  return {
+    items: result.rows.map(mapQuestionnaireRun),
+    pagination,
+  };
 }
 
 export async function deleteDraftRun(input: {
@@ -806,6 +1004,77 @@ async function insertRun(client: PoolClient, run: QuestionnaireRun): Promise<voi
   );
 }
 
+function sanitizePagination(input: PaginationInput): Required<Pick<PaginationInput, "page" | "pageSize" | "search">> {
+  const page = Number.isFinite(input.page) ? Math.max(1, Math.floor(input.page ?? 1)) : 1;
+  const rawPageSize = Number.isFinite(input.pageSize)
+    ? Math.max(1, Math.floor(input.pageSize ?? defaultPageSize))
+    : defaultPageSize;
+
+  return {
+    page,
+    pageSize: Math.min(rawPageSize, maxPageSize),
+    search: input.search?.trim().toLowerCase() ?? "",
+  };
+}
+
+function buildPagination(totalItems: number, requestedPage: number, pageSize: number): PaginationMeta {
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+
+  return {
+    page: Math.min(requestedPage, totalPages),
+    pageSize,
+    totalItems,
+    totalPages,
+  };
+}
+
+async function countRows(sql: string, params: unknown[]): Promise<number> {
+  const result = await pool.query<CountRow>(sql, params);
+
+  return Number(result.rows[0]?.count ?? 0);
+}
+
+function addSearchCondition(
+  conditions: string[],
+  params: unknown[],
+  fields: string[],
+  search: string,
+  rawFields: string[] = [],
+): void {
+  if (!search) {
+    return;
+  }
+
+  params.push(`%${search}%`);
+  const placeholder = `$${params.length}`;
+  const fieldConditions = [
+    ...fields.map((field) => `lower(${field}) like ${placeholder}`),
+    ...rawFields.map((field) => `lower(${field}) like ${placeholder}`),
+  ];
+
+  conditions.push(`(${fieldConditions.join(" or ")})`);
+}
+
+function addQuestionnaireSearchCondition(conditions: string[], params: unknown[], search: string): void {
+  if (!search) {
+    return;
+  }
+
+  params.push(`%${search}%`);
+  const placeholder = `$${params.length}`;
+
+  conditions.push(`(
+    lower(id) like ${placeholder}
+    or lower(title) like ${placeholder}
+    or exists (
+      select 1
+      from questionnaire_versions
+      where questionnaire_versions.questionnaire_id = questionnaires.id
+        and cast(questionnaire_versions.version as text) like ${placeholder}
+    )
+  )`);
+}
+
 async function addAuditLog(
   client: PoolClient,
   userId: string | null,
@@ -1067,4 +1336,8 @@ interface QuestionnaireWithVersionRow {
   title: string;
   version: number;
   source_json: Questionnaire;
+}
+
+interface CountRow {
+  count: string | number;
 }

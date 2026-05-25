@@ -1,12 +1,16 @@
-import type { CurrentUser, PublishedQuestionnaire, UserPreferences } from "../shared/api/backendApi";
+import type { CurrentUser, PaginationMeta, PublishedQuestionnaire, UserPreferences } from "../shared/api/backendApi";
 import { BrandHeader, type HeaderNavigationItem, type SettingsStatus } from "../shared/ui/BrandHeader";
+import { Pagination } from "../shared/ui/Pagination";
 
 interface ScenarioCatalogPageProps {
   questionnaires: PublishedQuestionnaire[];
+  pagination: PaginationMeta;
   status: "loading" | "ready" | "error";
   error: string;
   onSelectQuestionnaire: (questionnaire: PublishedQuestionnaire) => void;
   onRefresh: () => void;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
   onOpenManualUpload: () => void;
   onOpenAdminQuestionnaires?: () => void;
   navigationItems?: HeaderNavigationItem[];
@@ -20,10 +24,13 @@ interface ScenarioCatalogPageProps {
 
 export function ScenarioCatalogPage({
   questionnaires,
+  pagination,
   status,
   error,
   onSelectQuestionnaire,
   onRefresh,
+  onPageChange,
+  onPageSizeChange,
   onOpenManualUpload,
   onOpenAdminQuestionnaires,
   navigationItems,
@@ -112,6 +119,7 @@ export function ScenarioCatalogPage({
         )}
 
         {questionnaires.length > 0 && (
+          <>
           <div className="questionnaire-grid">
             {questionnaires.map((questionnaire) => (
               <article key={questionnaire.id} className="questionnaire-card scenario-card">
@@ -140,6 +148,16 @@ export function ScenarioCatalogPage({
               </article>
             ))}
           </div>
+          <Pagination
+            label="сценариев"
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            totalItems={pagination.totalItems}
+            totalPages={pagination.totalPages}
+            onPageChange={onPageChange}
+            onPageSizeChange={onPageSizeChange}
+          />
+          </>
         )}
       </section>
     </main>

@@ -18,6 +18,8 @@ import type {
   ChangePasswordInput,
   CreateAdminUserInput,
   ImportQuestionnairesResult,
+  ListPageParams,
+  PaginationMeta,
   PublishedQuestionnaire,
   QuestionnaireRun,
   UpdateProfileInput,
@@ -31,12 +33,12 @@ import {
   deleteQuestionnaireRunDraft,
   defaultUserPreferences,
   importQuestionnairesToBackend,
-  loadAdminQuestionnaires,
+  loadAdminQuestionnairesPage,
   loadCurrentUser,
   loadPublishedQuestionnaire,
-  loadPublishedQuestionnaires,
-  loadQuestionnaireRuns,
-  loadUsers,
+  loadPublishedQuestionnairesPage,
+  loadQuestionnaireRunsPage,
+  loadUsersPage,
   publishAdminQuestionnaireVersion,
   updateCurrentUserProfile,
   updateUserAccess,
@@ -45,6 +47,39 @@ import { BrandHeader, type SettingsStatus } from "./shared/ui/BrandHeader";
 import "./App.css";
 
 const authTokenStorageKey = "ks-questionnaire-auth-token";
+
+const emptyPagination: PaginationMeta = {
+  page: 1,
+  pageSize: 10,
+  totalItems: 0,
+  totalPages: 1,
+};
+
+const catalogInitialParams: Required<Pick<ListPageParams, "page" | "pageSize" | "search">> = {
+  page: 1,
+  pageSize: 6,
+  search: "",
+};
+
+const runsInitialParams: Required<Pick<ListPageParams, "page" | "pageSize" | "search" | "status">> = {
+  page: 1,
+  pageSize: 5,
+  search: "",
+  status: "all",
+};
+
+const adminUsersInitialParams: Required<Pick<ListPageParams, "page" | "pageSize" | "search" | "role">> = {
+  page: 1,
+  pageSize: 5,
+  search: "",
+  role: "all",
+};
+
+const adminQuestionnairesInitialParams: Required<Pick<ListPageParams, "page" | "pageSize" | "search">> = {
+  page: 1,
+  pageSize: 5,
+  search: "",
+};
 
 function replaceUserInList(users: AdminUser[], user: CurrentUser): AdminUser[] {
   return users.map((item) => (item.id === user.id ? user : item));
@@ -58,15 +93,35 @@ function App() {
   );
   const [authError, setAuthError] = useState("");
   const [publishedQuestionnaires, setPublishedQuestionnaires] = useState<PublishedQuestionnaire[]>([]);
+  const [catalogParams, setCatalogParams] = useState(catalogInitialParams);
+  const [catalogPagination, setCatalogPagination] = useState<PaginationMeta>({
+    ...emptyPagination,
+    pageSize: catalogInitialParams.pageSize,
+  });
   const [catalogStatus, setCatalogStatus] = useState<"loading" | "ready" | "error">("loading");
   const [catalogError, setCatalogError] = useState("");
   const [runs, setRuns] = useState<QuestionnaireRun[]>([]);
+  const [runsParams, setRunsParams] = useState(runsInitialParams);
+  const [runsPagination, setRunsPagination] = useState<PaginationMeta>({
+    ...emptyPagination,
+    pageSize: runsInitialParams.pageSize,
+  });
   const [runsStatus, setRunsStatus] = useState<"loading" | "ready" | "error">("loading");
   const [runsError, setRunsError] = useState("");
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
+  const [adminUsersParams, setAdminUsersParams] = useState(adminUsersInitialParams);
+  const [adminUsersPagination, setAdminUsersPagination] = useState<PaginationMeta>({
+    ...emptyPagination,
+    pageSize: adminUsersInitialParams.pageSize,
+  });
   const [adminUsersStatus, setAdminUsersStatus] = useState<"loading" | "ready" | "error">("loading");
   const [adminUsersError, setAdminUsersError] = useState("");
   const [adminQuestionnaires, setAdminQuestionnaires] = useState<AdminQuestionnaire[]>([]);
+  const [adminQuestionnairesParams, setAdminQuestionnairesParams] = useState(adminQuestionnairesInitialParams);
+  const [adminQuestionnairesPagination, setAdminQuestionnairesPagination] = useState<PaginationMeta>({
+    ...emptyPagination,
+    pageSize: adminQuestionnairesInitialParams.pageSize,
+  });
   const [adminQuestionnairesStatus, setAdminQuestionnairesStatus] = useState<"loading" | "ready" | "error">("loading");
   const [adminQuestionnairesError, setAdminQuestionnairesError] = useState("");
   const [questionnaires, setQuestionnaires] = useState<Questionnaire[]>([]);
@@ -138,13 +193,14 @@ function App() {
 
     let isCancelled = false;
 
-    loadPublishedQuestionnaires(authToken)
-      .then((items) => {
+    loadPublishedQuestionnairesPage(authToken, catalogParams)
+      .then((page) => {
         if (isCancelled) {
           return;
         }
 
-        setPublishedQuestionnaires(items);
+        setPublishedQuestionnaires(page.items);
+        setCatalogPagination(page.pagination);
         setCatalogStatus("ready");
       })
       .catch((error) => {
@@ -164,7 +220,7 @@ function App() {
     return () => {
       isCancelled = true;
     };
-  }, [authToken, currentUserId, currentUserRole]);
+  }, [authToken, catalogParams, currentUserId, currentUserRole]);
 
   async function refreshPublishedQuestionnaires() {
     if (!authToken) {
@@ -175,8 +231,9 @@ function App() {
     setCatalogError("");
 
     try {
-      const items = await loadPublishedQuestionnaires(authToken);
-      setPublishedQuestionnaires(items);
+      const page = await loadPublishedQuestionnairesPage(authToken, catalogParams);
+      setPublishedQuestionnaires(page.items);
+      setCatalogPagination(page.pagination);
       setCatalogStatus("ready");
     } catch (error) {
       setPublishedQuestionnaires([]);
@@ -198,8 +255,9 @@ function App() {
     setRunsError("");
 
     try {
-      const items = await loadQuestionnaireRuns(authToken);
-      setRuns(items);
+      const page = await loadQuestionnaireRunsPage(authToken, runsParams);
+      setRuns(page.items);
+      setRunsPagination(page.pagination);
       setRunsStatus("ready");
     } catch (error) {
       setRuns([]);
@@ -217,8 +275,9 @@ function App() {
     setAdminUsersError("");
 
     try {
-      const items = await loadUsers(authToken);
-      setAdminUsers(items);
+      const page = await loadUsersPage(authToken, adminUsersParams);
+      setAdminUsers(page.items);
+      setAdminUsersPagination(page.pagination);
       setAdminUsersStatus("ready");
     } catch (error) {
       setAdminUsers([]);
@@ -236,8 +295,9 @@ function App() {
     setAdminQuestionnairesError("");
 
     try {
-      const items = await loadAdminQuestionnaires(authToken);
-      setAdminQuestionnaires(items);
+      const page = await loadAdminQuestionnairesPage(authToken, adminQuestionnairesParams);
+      setAdminQuestionnaires(page.items);
+      setAdminQuestionnairesPagination(page.pagination);
       setAdminQuestionnairesStatus("ready");
     } catch (error) {
       setAdminQuestionnaires([]);
@@ -246,6 +306,103 @@ function App() {
         error instanceof Error ? error.message : "Не удалось получить список сценариев из базы.",
       );
     }
+  }
+
+  function handleCatalogPageChange(page: number) {
+    setCatalogParams((current) => ({ ...current, page }));
+  }
+
+  function handleCatalogPageSizeChange(pageSize: number) {
+    setCatalogParams((current) => ({ ...current, page: 1, pageSize }));
+  }
+
+  function handleRunsParamsChange(input: Partial<typeof runsParams>) {
+    const nextParams = {
+      ...runsParams,
+      ...input,
+      page: input.page ?? 1,
+    };
+
+    setRunsParams(nextParams);
+
+    if (!authToken) {
+      return;
+    }
+
+    setRunsStatus("loading");
+    setRunsError("");
+
+    void loadQuestionnaireRunsPage(authToken, nextParams)
+      .then((page) => {
+        setRuns(page.items);
+        setRunsPagination(page.pagination);
+        setRunsStatus("ready");
+      })
+      .catch((error) => {
+        setRuns([]);
+        setRunsStatus("error");
+        setRunsError(error instanceof Error ? error.message : "РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РїСЂРѕС…РѕР¶РґРµРЅРёР№.");
+      });
+  }
+
+  function handleAdminUsersParamsChange(input: Partial<typeof adminUsersParams>) {
+    const nextParams = {
+      ...adminUsersParams,
+      ...input,
+      page: input.page ?? 1,
+    };
+
+    setAdminUsersParams(nextParams);
+
+    if (!authToken || currentUserRole !== "admin") {
+      return;
+    }
+
+    setAdminUsersStatus("loading");
+    setAdminUsersError("");
+
+    void loadUsersPage(authToken, nextParams)
+      .then((page) => {
+        setAdminUsers(page.items);
+        setAdminUsersPagination(page.pagination);
+        setAdminUsersStatus("ready");
+      })
+      .catch((error) => {
+        setAdminUsers([]);
+        setAdminUsersStatus("error");
+        setAdminUsersError(error instanceof Error ? error.message : "РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№.");
+      });
+  }
+
+  function handleAdminQuestionnairesParamsChange(input: Partial<typeof adminQuestionnairesParams>) {
+    const nextParams = {
+      ...adminQuestionnairesParams,
+      ...input,
+      page: input.page ?? 1,
+    };
+
+    setAdminQuestionnairesParams(nextParams);
+
+    if (!authToken || currentUserRole !== "admin") {
+      return;
+    }
+
+    setAdminQuestionnairesStatus("loading");
+    setAdminQuestionnairesError("");
+
+    void loadAdminQuestionnairesPage(authToken, nextParams)
+      .then((page) => {
+        setAdminQuestionnaires(page.items);
+        setAdminQuestionnairesPagination(page.pagination);
+        setAdminQuestionnairesStatus("ready");
+      })
+      .catch((error) => {
+        setAdminQuestionnaires([]);
+        setAdminQuestionnairesStatus("error");
+        setAdminQuestionnairesError(
+          error instanceof Error ? error.message : "РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє СЃС†РµРЅР°СЂРёРµРІ РёР· Р±Р°Р·С‹.",
+        );
+      });
   }
 
   function handleOpenRunsPage() {
@@ -312,6 +469,7 @@ function App() {
 
     const createdUser = await createAdminUser(authToken, input);
     setAdminUsers((items) => [createdUser, ...items.filter((item) => item.id !== createdUser.id)]);
+    handleAdminUsersParamsChange({ page: 1 });
   }
 
   async function handleImportAdminQuestionnaires(input: unknown): Promise<ImportQuestionnairesResult[]> {
@@ -347,18 +505,7 @@ function App() {
       return;
     }
 
-    const refreshedItems = await loadPublishedQuestionnaires(authToken);
-    setPublishedQuestionnaires(refreshedItems);
-    setCatalogStatus("ready");
-
-    const refreshedQuestionnaire = refreshedItems.find((item) => item.id === questionnaireId);
-
-    if (!refreshedQuestionnaire) {
-      setAdminQuestionnairesError("Сценарий опубликован, но список оператора ещё не обновился. Нажмите «Обновить» и попробуйте снова.");
-      return;
-    }
-
-    await handlePublishedQuestionnaireSelect(refreshedQuestionnaire);
+    await openPublishedQuestionnaire(questionnaireId);
   }
 
   async function handleDeleteDraftRun(run: QuestionnaireRun): Promise<void> {
@@ -371,10 +518,14 @@ function App() {
     }
 
     await deleteQuestionnaireRunDraft(authToken, run.id);
-    setRuns((items) => items.filter((item) => item.id !== run.id));
+    await refreshRuns();
   }
 
   async function handlePublishedQuestionnaireSelect(questionnaire: PublishedQuestionnaire) {
+    await openPublishedQuestionnaire(questionnaire.id);
+  }
+
+  async function openPublishedQuestionnaire(questionnaireId: string) {
     if (!authToken) {
       setCatalogError("Сессия завершена. Войдите заново.");
       return;
@@ -384,7 +535,7 @@ function App() {
     setCatalogStatus("loading");
 
     try {
-      const details = await loadPublishedQuestionnaire(authToken, questionnaire.id);
+      const details = await loadPublishedQuestionnaire(authToken, questionnaireId);
       const parsed = singleQuestionnaireSchema.safeParse(details.source);
 
       if (!parsed.success) {
@@ -401,7 +552,7 @@ function App() {
         return;
       }
 
-      const run = await createQuestionnaireRun(authToken, questionnaire.id);
+      const run = await createQuestionnaireRun(authToken, questionnaireId);
 
       setSelectedQuestionnaire(parsed.data);
       setQuestionnaireSource("backend");
@@ -737,9 +888,12 @@ function App() {
       <>
         <AdminUsersPage
           users={adminUsers}
+          pagination={adminUsersPagination}
+          params={adminUsersParams}
           status={adminUsersStatus}
           error={adminUsersError}
           onRefresh={refreshAdminUsers}
+          onParamsChange={handleAdminUsersParamsChange}
           onCreateUser={handleCreateAdminUser}
           onUpdateUser={handleUpdateUserAccess}
           {...sharedHeaderProps}
@@ -761,9 +915,12 @@ function App() {
       <>
         <AdminQuestionnairesPage
           questionnaires={adminQuestionnaires}
+          pagination={adminQuestionnairesPagination}
+          params={adminQuestionnairesParams}
           status={adminQuestionnairesStatus}
           error={adminQuestionnairesError}
           onRefresh={refreshAdminQuestionnaires}
+          onParamsChange={handleAdminQuestionnairesParamsChange}
           onImportJson={handleImportAdminQuestionnaires}
           onPublishVersion={handlePublishAdminQuestionnaireVersion}
           onOpenAsOperator={handleOpenPublishedQuestionnaireById}
@@ -787,9 +944,12 @@ function App() {
         <MyRunsPage
           runs={runs}
           questionnaires={publishedQuestionnaires}
+          pagination={runsPagination}
+          params={runsParams}
           status={runsStatus}
           error={runsError}
           onRefresh={refreshRuns}
+          onParamsChange={handleRunsParamsChange}
           onContinueRun={handleContinueRun}
           onDeleteDraftRun={handleDeleteDraftRun}
           onBackToCatalog={handleBackToCatalog}
@@ -812,10 +972,13 @@ function App() {
       {sharedHeaderProps && !isManualUploadOpen && (
         <ScenarioCatalogPage
           questionnaires={publishedQuestionnaires}
+          pagination={catalogPagination}
           status={catalogStatus}
           error={catalogError}
           onSelectQuestionnaire={handlePublishedQuestionnaireSelect}
           onRefresh={refreshPublishedQuestionnaires}
+          onPageChange={handleCatalogPageChange}
+          onPageSizeChange={handleCatalogPageSizeChange}
           onOpenManualUpload={handleOpenManualUpload}
           onOpenAdminQuestionnaires={currentUser.role === "admin" ? handleOpenAdminQuestionnairesPage : undefined}
           {...sharedHeaderProps}

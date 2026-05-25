@@ -56,6 +56,8 @@ model Questionnaire {
   runs            QuestionnaireRun[]
 
   @@index([archived], map: "questionnaires_archived_idx")
+  @@index([updatedAt(sort: Desc), title], map: "questionnaires_updated_title_idx")
+  @@index([archived, title], map: "questionnaires_archived_title_idx")
   @@map("questionnaires")
 }
 
@@ -99,8 +101,10 @@ model QuestionnaireRun {
   operator               User?                  @relation(fields: [operatorId], references: [id])
 
   @@index([operatorId, updatedAt(sort: Desc)], map: "questionnaire_runs_operator_idx")
+  @@index([operatorId, startedAt(sort: Desc)], map: "questionnaire_runs_operator_started_idx")
   @@index([questionnaireId, startedAt(sort: Desc)], map: "questionnaire_runs_questionnaire_idx")
   @@index([status], map: "questionnaire_runs_status_idx")
+  @@index([status, startedAt(sort: Desc)], map: "questionnaire_runs_status_started_idx")
   @@map("questionnaire_runs")
 }
 

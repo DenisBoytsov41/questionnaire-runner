@@ -5,7 +5,7 @@ import {
   questionnaireInputSchema,
   validateQuestionnaireContract,
 } from "./lib/questionnaireContract.js";
-import type { UserPreferences } from "./types.js";
+import type { QuestionnaireRun, UserPreferences, UserRole } from "./types.js";
 import { signToken, toPublicUser, verifyPassword } from "./lib/crypto.js";
 import {
   createContext,
@@ -29,10 +29,10 @@ import {
   getPublishedQuestionnaire,
   getRunForUser,
   importQuestionnaireVersions,
-  listQuestionnairesForAdmin,
-  listPublishedQuestionnaires,
-  listRunsForUser,
-  listUsers,
+  listQuestionnairesForAdminPage,
+  listPublishedQuestionnairesPage,
+  listRunsForUserPage,
+  listUsersPage,
   publishQuestionnaireVersion,
   StorageConflictError,
   StorageForbiddenError,
@@ -51,6 +51,48 @@ import { attachRequestLogger, logError, logInfo, logWarn } from "./lib/logger.js
 const port = Number(process.env.PORT ?? 4100);
 const jwtSecret = process.env.JWT_SECRET ?? "dev-secret-change-me";
 const maxAvatarImagePayloadLength = 14_500_000;
+
+function readPaginationQuery(url: URL) {
+  return {
+    page: readPositiveIntegerParam(url, "page"),
+    pageSize: readPositiveIntegerParam(url, "pageSize"),
+    search: url.searchParams.get("search") ?? "",
+  };
+}
+
+function readUserListQuery(url: URL) {
+  const role = url.searchParams.get("role");
+  const normalizedRole: UserRole | "all" =
+    role === "user" || role === "operator" || role === "admin" ? role : "all";
+
+  return {
+    ...readPaginationQuery(url),
+    role: normalizedRole,
+  };
+}
+
+function readRunListQuery(url: URL) {
+  const status = url.searchParams.get("status");
+  const normalizedStatus: QuestionnaireRun["status"] | "all" =
+    status === "draft" || status === "finished" ? status : "all";
+
+  return {
+    ...readPaginationQuery(url),
+    status: normalizedStatus,
+  };
+}
+
+function readPositiveIntegerParam(url: URL, name: string): number | undefined {
+  const value = url.searchParams.get(name);
+
+  if (!value) {
+    return undefined;
+  }
+
+  const parsed = Number(value);
+
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : undefined;
+}
 
 const registerSchema = z.object({
   login: z.string().trim().min(3),
@@ -223,7 +265,8 @@ const server = createServer(async (req, res) => {
 
     if (req.method === "GET" && parts[1] === "users") {
       requireRole(context, ["admin"]);
-      sendJson(res, 200, { users: await listUsers() });
+      const page = await listUsersPage(readUserListQuery(context.url));
+      sendJson(res, 200, { users: page.items, pagination: page.pagination });
       return;
     }
 
@@ -259,7 +302,8 @@ const server = createServer(async (req, res) => {
 
     if (req.method === "GET" && parts[1] === "questionnaires" && !parts[2]) {
       requireRole(context, ["operator", "admin"]);
-      sendJson(res, 200, { questionnaires: await listPublishedQuestionnaires() });
+      const page = await listPublishedQuestionnairesPage(readPaginationQuery(context.url));
+      sendJson(res, 200, { questionnaires: page.items, pagination: page.pagination });
       return;
     }
 
@@ -285,7 +329,8 @@ const server = createServer(async (req, res) => {
 
     if (req.method === "GET" && parts[1] === "admin" && parts[2] === "questionnaires" && !parts[3]) {
       requireRole(context, ["admin"]);
-      sendJson(res, 200, { questionnaires: await listQuestionnairesForAdmin() });
+      const page = await listQuestionnairesForAdminPage(readPaginationQuery(context.url));
+      sendJson(res, 200, { questionnaires: page.items, pagination: page.pagination });
       return;
     }
 
@@ -363,7 +408,8 @@ const server = createServer(async (req, res) => {
 
     if (req.method === "GET" && parts[1] === "questionnaire-runs" && !parts[2]) {
       const user = requireRole(context, ["operator", "admin"]);
-      sendJson(res, 200, { runs: await listRunsForUser(user.id, user.role) });
+      const page = await listRunsForUserPage(user.id, user.role, readRunListQuery(context.url));
+      sendJson(res, 200, { runs: page.items, pagination: page.pagination });
       return;
     }
 

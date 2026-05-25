@@ -1,19 +1,25 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import type {
   AdminUser,
   CreateAdminUserInput,
   CurrentUser,
+  ListPageParams,
+  PaginationMeta,
   UserPreferences,
   UserRole,
 } from "../shared/api/backendApi";
 import { BrandHeader, type HeaderNavigationItem, type SettingsStatus } from "../shared/ui/BrandHeader";
+import { Pagination } from "../shared/ui/Pagination";
 import { RoundedSelect } from "../shared/ui/RoundedSelect";
 
 interface AdminUsersPageProps {
   users: AdminUser[];
+  pagination: PaginationMeta;
+  params: Required<Pick<ListPageParams, "page" | "pageSize" | "search" | "role">>;
   status: "loading" | "ready" | "error";
   error: string;
   onRefresh: () => void;
+  onParamsChange: (params: Partial<Required<Pick<ListPageParams, "page" | "pageSize" | "search" | "role">>>) => void;
   onCreateUser: (input: CreateAdminUserInput) => Promise<void>;
   onUpdateUser: (userId: string, input: { role: UserRole; active: boolean }) => Promise<void>;
   navigationItems?: HeaderNavigationItem[];
@@ -45,9 +51,12 @@ const roleOptions: Array<{ value: UserRole; label: string; description: string }
 
 export function AdminUsersPage({
   users,
+  pagination,
+  params,
   status,
   error,
   onRefresh,
+  onParamsChange,
   onCreateUser,
   onUpdateUser,
   navigationItems,
@@ -58,8 +67,6 @@ export function AdminUsersPage({
   onOpenProfile,
   onLogout,
 }: AdminUsersPageProps) {
-  const [roleFilter, setRoleFilter] = useState<"all" | UserRole>("all");
-  const [searchText, setSearchText] = useState("");
   const [savingUserId, setSavingUserId] = useState("");
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [createSuccess, setCreateSuccess] = useState("");
@@ -75,11 +82,6 @@ export function AdminUsersPage({
   });
   const [localError, setLocalError] = useState("");
   const isLoading = status === "loading";
-
-  const filteredUsers = useMemo(
-    () => filterUsers(users, roleFilter, searchText),
-    [roleFilter, searchText, users],
-  );
 
   async function updateAccess(targetUser: AdminUser, input: { role?: UserRole; active?: boolean }) {
     setSavingUserId(targetUser.id);
@@ -166,7 +168,7 @@ export function AdminUsersPage({
           </div>
 
           <div className="admin-users-metrics">
-            <AdminMetric label="Всего" value={users.length} />
+            <AdminMetric label="Всего" value={pagination.totalItems} />
             <AdminMetric label="Операторы" value={users.filter((item) => item.role === "operator").length} />
             <AdminMetric label="Без доступа" value={users.filter((item) => item.role === "user").length} />
           </div>
@@ -177,8 +179,8 @@ export function AdminUsersPage({
             <span>Найти сотрудника</span>
             <input
               type="search"
-              value={searchText}
-              onChange={(event) => setSearchText(event.target.value)}
+              value={params.search}
+              onChange={(event) => onParamsChange({ search: event.target.value })}
               placeholder="ФИО, логин, должность или почта"
             />
           </label>
@@ -186,8 +188,8 @@ export function AdminUsersPage({
           <div className="runs-filter-group" aria-label="Фильтр по роли">
             <button
               type="button"
-              className={roleFilter === "all" ? "active" : ""}
-              onClick={() => setRoleFilter("all")}
+              className={params.role === "all" ? "active" : ""}
+              onClick={() => onParamsChange({ role: "all" })}
             >
               Все
             </button>
@@ -195,8 +197,8 @@ export function AdminUsersPage({
               <button
                 key={role.value}
                 type="button"
-                className={roleFilter === role.value ? "active" : ""}
-                onClick={() => setRoleFilter(role.value)}
+                className={params.role === role.value ? "active" : ""}
+                onClick={() => onParamsChange({ role: role.value })}
               >
                 {role.label}
               </button>
@@ -337,7 +339,7 @@ export function AdminUsersPage({
           </div>
         )}
 
-        {!isLoading && filteredUsers.length === 0 && (
+        {!isLoading && users.length === 0 && (
           <div className="runs-empty-card">
             <p className="page-kicker">Пока пусто</p>
             <h2>Подходящих сотрудников нет</h2>
@@ -345,9 +347,10 @@ export function AdminUsersPage({
           </div>
         )}
 
-        {filteredUsers.length > 0 && (
-          <div className="admin-users-list">
-            {filteredUsers.map((employee) => {
+        {users.length > 0 && (
+          <>
+            <div className="admin-users-list">
+              {users.map((employee) => {
               const isSelf = employee.id === user.id;
               const isSaving = savingUserId === employee.id;
 
@@ -406,8 +409,18 @@ export function AdminUsersPage({
                   </div>
                 </article>
               );
-            })}
-          </div>
+              })}
+            </div>
+            <Pagination
+              label="сотрудников"
+              page={pagination.page}
+              pageSize={pagination.pageSize}
+              totalItems={pagination.totalItems}
+              totalPages={pagination.totalPages}
+              onPageChange={(page) => onParamsChange({ page })}
+              onPageSizeChange={(pageSize) => onParamsChange({ page: 1, pageSize })}
+            />
+          </>
         )}
       </section>
     </main>
@@ -423,31 +436,6 @@ function AdminMetric({ label, value }: { label: string; value: number }) {
   );
 }
 
-function filterUsers(users: AdminUser[], roleFilter: "all" | UserRole, searchText: string): AdminUser[] {
-  const normalizedSearch = searchText.trim().toLowerCase();
-
-  return users.filter((user) => {
-    if (roleFilter !== "all" && user.role !== roleFilter) {
-      return false;
-    }
-
-    if (!normalizedSearch) {
-      return true;
-    }
-
-    const haystack = [
-      user.login,
-      user.fullName,
-      user.email,
-      user.phone,
-      user.position,
-      getRoleLabel(user.role),
-    ].join(" ").toLowerCase();
-
-    return haystack.includes(normalizedSearch);
-  });
-}
-
 function getInitials(user: AdminUser): string {
   const source = user.fullName || user.login || "Сотрудник";
   const initials = source
@@ -459,10 +447,6 @@ function getInitials(user: AdminUser): string {
     .join("");
 
   return initials || "С";
-}
-
-function getRoleLabel(role: UserRole): string {
-  return roleOptions.find((option) => option.value === role)?.label ?? "Без доступа";
 }
 
 function getRoleDescription(role: UserRole): string {
