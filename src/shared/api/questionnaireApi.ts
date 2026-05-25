@@ -44,7 +44,7 @@ export function parseQuestionnaireJsonText(text: string): QuestionnaireParseResu
   let rawData: unknown;
 
   try {
-    rawData = JSON.parse(text);
+    rawData = JSON.parse(stripJsonBom(text));
   } catch (error) {
     return {
       ok: false,
@@ -100,6 +100,10 @@ export function readJsonFile(file: File): Promise<QuestionnaireParseResult> {
 
     reader.readAsText(file, "UTF-8");
   });
+}
+
+function stripJsonBom(text: string): string {
+  return text.replace(/^\uFEFF/, "");
 }
 
 function getErrorMessage(error: unknown): string {

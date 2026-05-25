@@ -47,7 +47,7 @@ export async function readJsonBody<T>(req: IncomingMessage): Promise<T> {
     chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
   }
 
-  const rawBody = Buffer.concat(chunks).toString("utf8");
+  const rawBody = stripJsonBom(Buffer.concat(chunks).toString("utf8"));
 
   if (!rawBody.trim()) {
     return {} as T;
@@ -58,6 +58,10 @@ export async function readJsonBody<T>(req: IncomingMessage): Promise<T> {
   } catch {
     throw new HttpError(400, "Тело запроса должно быть корректным JSON.");
   }
+}
+
+function stripJsonBom(text: string): string {
+  return text.replace(/^\uFEFF/, "");
 }
 
 export function sendJson(res: ServerResponse, status: number, payload: unknown): void {
