@@ -9,7 +9,8 @@ import type {
   UserRole,
 } from "../types.js";
 import type { Questionnaire } from "./questionnaireContract.js";
-import { createId, hashPassword, toPublicUser } from "./crypto.js";
+import { createId, hashPassword, toPublicUser, verifyPassword } from "./crypto.js";
+import { logWarn } from "./logger.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -18,6 +19,21 @@ if (!databaseUrl) {
 }
 
 const pool = new Pool({ connectionString: databaseUrl });
+const maxAvatarImagePayloadLength = 14_500_000;
+
+pool.on("error", (error: Error & { code?: string }) => {
+  const code = error.code ?? "unknown";
+
+  if (code === "57P01" || code === "57P02" || code === "57P03") {
+    logWarn("database", "PostgreSQL закрыл простаивающее соединение", { code });
+    return;
+  }
+
+  logWarn("database", "Ошибка простаивающего соединения PostgreSQL", {
+    code,
+    message: error.message,
+  });
+});
 
 const defaultPreferences: UserPreferences = {
   theme: "light",
@@ -31,6 +47,10 @@ const defaultPreferences: UserPreferences = {
 export async function checkDatabase(): Promise<void> {
   await ensureInitialAdmin();
   await pool.query("select 1");
+}
+
+export async function closeDatabase(): Promise<void> {
+  await pool.end();
 }
 
 export async function getUserById(userId: string): Promise<StoredUser | null> {
@@ -58,13 +78,20 @@ export async function createUser(input: {
   login: string;
   password: string;
   fullName: string;
+  email?: string;
+  phone?: string;
+  position?: string;
+  role?: UserRole;
+  active?: boolean;
 }): Promise<PublicUser> {
   return inTransaction(async (client) => {
     await ensureInitialAdmin(client);
 
+    const login = input.login.trim();
+    const fullName = input.fullName.trim();
     const exists = await client.query<{ id: string }>(
       "select id from users where lower(login) = lower($1)",
-      [input.login],
+      [login],
     );
 
     if (exists.rowCount) {
@@ -75,13 +102,13 @@ export async function createUser(input: {
     const { hash, salt } = hashPassword(input.password);
     const user: StoredUser = {
       id: createId("usr"),
-      login: input.login,
-      fullName: input.fullName,
-      email: "",
-      phone: "",
-      position: "",
-      role: "user",
-      active: true,
+      login,
+      fullName,
+      email: input.email?.trim() ?? "",
+      phone: input.phone?.trim() ?? "",
+      position: input.position?.trim() ?? "",
+      role: input.role ?? "user",
+      active: input.active ?? true,
       preferences: defaultPreferences,
       passwordHash: hash,
       passwordSalt: salt,
@@ -90,7 +117,11 @@ export async function createUser(input: {
     };
 
     await insertUser(client, user);
-    await addAuditLog(client, user.id, "user.registered", "user", user.id, { login: user.login });
+    await addAuditLog(client, user.id, "user.registered", "user", user.id, {
+      login: user.login,
+      role: user.role,
+      active: user.active,
+    });
 
     return toPublicUser(user);
   });
@@ -173,6 +204,45 @@ export async function updateUserProfile(input: {
     }
 
     return user ? toPublicUser(user) : null;
+  });
+}
+
+export async function changeUserPassword(input: {
+  userId: string;
+  currentPassword: string;
+  newPassword: string;
+}): Promise<void> {
+  return inTransaction(async (client) => {
+    await ensureInitialAdmin(client);
+
+    const current = await client.query<UserRow>(userSelectSql("where id = $1"), [input.userId]);
+    const user = current.rows[0] ? mapUser(current.rows[0]) : null;
+
+    if (!user || !user.active) {
+      throw new StorageForbiddenError("Пользователь не найден или вход закрыт.");
+    }
+
+    if (!verifyPassword(input.currentPassword, user)) {
+      throw new StorageForbiddenError("Текущий пароль указан неверно.");
+    }
+
+    if (input.currentPassword === input.newPassword) {
+      throw new StorageConflictError("Новый пароль должен отличаться от текущего.");
+    }
+
+    const { hash, salt } = hashPassword(input.newPassword);
+
+    await client.query(
+      `
+        update users
+        set password_hash = $2,
+            password_salt = $3,
+            updated_at = now()
+        where id = $1
+      `,
+      [input.userId, hash, salt],
+    );
+    await addAuditLog(client, user.id, "user.password_changed", "user", user.id, {});
   });
 }
 
@@ -316,6 +386,45 @@ export async function publishQuestionnaireVersion(input: {
   });
 }
 
+export async function listQuestionnairesForAdmin() {
+  await ensureInitialAdmin();
+
+  const questionnairesResult = await pool.query<QuestionnaireRow>(
+    questionnaireSelectSql("order by updated_at desc, title"),
+  );
+  const versionsResult = await pool.query<QuestionnaireVersionRow>(
+    versionSelectSql("order by questionnaire_id, version desc"),
+  );
+  const versionsByQuestionnaire = new Map<string, StoredQuestionnaireVersion[]>();
+
+  for (const row of versionsResult.rows) {
+    const version = mapQuestionnaireVersion(row);
+    const versions = versionsByQuestionnaire.get(version.questionnaireId) ?? [];
+
+    versions.push(version);
+    versionsByQuestionnaire.set(version.questionnaireId, versions);
+  }
+
+  return questionnairesResult.rows.map((row) => {
+    const questionnaire = mapQuestionnaire(row);
+    const versions = versionsByQuestionnaire.get(questionnaire.id) ?? [];
+
+    return {
+      ...questionnaire,
+      versions: versions.map((version) => ({
+        id: version.id,
+        questionnaireId: version.questionnaireId,
+        version: version.version,
+        title: version.title,
+        active: version.active,
+        published: version.published,
+        importedBy: version.importedBy,
+        importedAt: version.importedAt,
+      })),
+    };
+  });
+}
+
 export async function listPublishedQuestionnaires() {
   await ensureInitialAdmin();
   const result = await pool.query<PublishedQuestionnaireRow>(`
@@ -432,6 +541,41 @@ export async function listRunsForUser(userId: string, role: UserRole): Promise<Q
     : await pool.query<QuestionnaireRunRow>(runSelectSql("where operator_id = $1 order by started_at desc"), [userId]);
 
   return result.rows.map(mapQuestionnaireRun);
+}
+
+export async function deleteDraftRun(input: {
+  runId: string;
+  userId: string;
+  role: UserRole;
+}): Promise<boolean> {
+  return inTransaction(async (client) => {
+    const currentResult = await client.query<QuestionnaireRunRow>(runSelectSql("where id = $1"), [input.runId]);
+    const currentRun = currentResult.rows[0] ? mapQuestionnaireRun(currentResult.rows[0]) : null;
+
+    if (!currentRun) {
+      return false;
+    }
+
+    if (input.role !== "admin" && currentRun.operatorId !== input.userId) {
+      throw new StorageForbiddenError("Нет доступа к этому прохождению.");
+    }
+
+    if (currentRun.status !== "draft") {
+      throw new StorageConflictError("Удалить можно только черновик. Завершённое прохождение остаётся в истории.");
+    }
+
+    await client.query("delete from questionnaire_runs where id = $1", [input.runId]);
+    await addAuditLog(
+      client,
+      input.userId,
+      "run.draft_deleted",
+      "questionnaire_run",
+      input.runId,
+      { questionnaireId: currentRun.questionnaireId },
+    );
+
+    return true;
+  });
 }
 
 export async function updateRunDraft(input: {
@@ -554,7 +698,7 @@ async function ensureInitialAdmin(existingClient?: PoolClient): Promise<void> {
 
     const now = new Date().toISOString();
     const adminLogin = process.env.ADMIN_LOGIN?.trim() || "admin";
-    const adminPassword = process.env.ADMIN_PASSWORD?.trim() || "admin123";
+    const adminPassword = process.env.ADMIN_PASSWORD?.trim() || "KService-Admin-2026!";
     const { hash, salt } = hashPassword(adminPassword);
 
     await insertUser(client, {
@@ -845,7 +989,7 @@ function normalizeProfileColor(value: unknown): UserPreferences["profileColor"] 
 }
 
 function normalizeAvatarImage(value: unknown): string {
-  if (typeof value === "string" && value.startsWith("data:image/") && value.length <= 900_000) {
+  if (typeof value === "string" && value.startsWith("data:image/") && value.length <= maxAvatarImagePayloadLength) {
     return value;
   }
 

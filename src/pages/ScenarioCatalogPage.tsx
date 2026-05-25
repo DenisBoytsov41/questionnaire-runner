@@ -8,8 +8,7 @@ interface ScenarioCatalogPageProps {
   onSelectQuestionnaire: (questionnaire: PublishedQuestionnaire) => void;
   onRefresh: () => void;
   onOpenManualUpload: () => void;
-  onOpenRuns: () => void;
-  onOpenAdminUsers: () => void;
+  onOpenAdminQuestionnaires?: () => void;
   navigationItems?: HeaderNavigationItem[];
   user: CurrentUser;
   settings: UserPreferences;
@@ -26,8 +25,7 @@ export function ScenarioCatalogPage({
   onSelectQuestionnaire,
   onRefresh,
   onOpenManualUpload,
-  onOpenRuns,
-  onOpenAdminUsers,
+  onOpenAdminQuestionnaires,
   navigationItems,
   user,
   settings,
@@ -43,8 +41,8 @@ export function ScenarioCatalogPage({
       <BrandHeader
         subtitle="Рабочее место оператора"
         action={{
-          label: "Загрузить файл вручную",
-          onClick: onOpenManualUpload,
+          label: user.role === "admin" && onOpenAdminQuestionnaires ? "Сценарии в базе" : "Загрузить файл вручную",
+          onClick: user.role === "admin" && onOpenAdminQuestionnaires ? onOpenAdminQuestionnaires : onOpenManualUpload,
         }}
         navigationItems={navigationItems}
         user={user}
@@ -97,20 +95,18 @@ export function ScenarioCatalogPage({
             </p>
 
             <div className="scenario-empty-actions">
-              <button type="button" className="primary-button" onClick={onOpenManualUpload}>
-                Загрузить файл вручную
-              </button>
+              {user.role === "admin" && onOpenAdminQuestionnaires ? (
+                <button type="button" className="primary-button" onClick={onOpenAdminQuestionnaires}>
+                  Загрузить сценарий в базу
+                </button>
+              ) : (
+                <button type="button" className="primary-button" onClick={onOpenManualUpload}>
+                  Загрузить файл вручную
+                </button>
+              )}
               <button type="button" className="secondary-button" onClick={onRefresh}>
                 Проверить ещё раз
               </button>
-              <button type="button" className="secondary-button" onClick={onOpenRuns}>
-                Мои прохождения
-              </button>
-              {user.role === "admin" && (
-                <button type="button" className="secondary-button" onClick={onOpenAdminUsers}>
-                  Пользователи
-                </button>
-              )}
             </div>
           </div>
         )}

@@ -1,0 +1,386 @@
+import { useMemo, useRef, useState } from "react";
+import type {
+  AdminQuestionnaire,
+  CurrentUser,
+  ImportQuestionnairesResult,
+  UserPreferences,
+} from "../shared/api/backendApi";
+import { parseQuestionnaireJsonText, readJsonFile } from "../shared/api/questionnaireApi";
+import { BrandHeader, type HeaderNavigationItem, type SettingsStatus } from "../shared/ui/BrandHeader";
+
+interface AdminQuestionnairesPageProps {
+  questionnaires: AdminQuestionnaire[];
+  status: "loading" | "ready" | "error";
+  error: string;
+  onRefresh: () => void;
+  onImportJson: (input: unknown) => Promise<ImportQuestionnairesResult[]>;
+  onPublishVersion: (questionnaireId: string, versionId: string) => Promise<void>;
+  onOpenAsOperator: (questionnaireId: string) => Promise<void>;
+  navigationItems?: HeaderNavigationItem[];
+  user: CurrentUser;
+  settings: UserPreferences;
+  settingsStatus: SettingsStatus;
+  onSettingsChange: (settings: UserPreferences) => void;
+  onOpenProfile: () => void;
+  onLogout: () => void;
+}
+
+export function AdminQuestionnairesPage({
+  questionnaires,
+  status,
+  error,
+  onRefresh,
+  onImportJson,
+  onPublishVersion,
+  onOpenAsOperator,
+  navigationItems,
+  user,
+  settings,
+  settingsStatus,
+  onSettingsChange,
+  onOpenProfile,
+  onLogout,
+}: AdminQuestionnairesPageProps) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [jsonText, setJsonText] = useState("");
+  const [searchText, setSearchText] = useState("");
+  const [localError, setLocalError] = useState("");
+  const [imported, setImported] = useState<ImportQuestionnairesResult[]>([]);
+  const [importStatus, setImportStatus] = useState<"idle" | "loading">("idle");
+  const [publishingVersionId, setPublishingVersionId] = useState("");
+  const [openingQuestionnaireId, setOpeningQuestionnaireId] = useState("");
+  const isLoading = status === "loading";
+  const filteredQuestionnaires = useMemo(
+    () => filterQuestionnaires(questionnaires, searchText),
+    [questionnaires, searchText],
+  );
+
+  async function importInput(input: unknown) {
+    setImportStatus("loading");
+    setLocalError("");
+    setImported([]);
+
+    try {
+      const result = await onImportJson(input);
+      setImported(result);
+      setJsonText("");
+      onRefresh();
+    } catch (importError) {
+      setLocalError(importError instanceof Error ? importError.message : "Не удалось загрузить сценарий в базу.");
+    } finally {
+      setImportStatus("idle");
+    }
+  }
+
+  function importFromText() {
+    const parsed = parseQuestionnaireJsonText(jsonText);
+
+    if (!parsed.ok) {
+      setLocalError(parsed.errors.join("\n"));
+      setImported([]);
+      return;
+    }
+
+    void importInput(parsed.input);
+  }
+
+  async function importFromFile(file: File | undefined) {
+    if (!file) {
+      return;
+    }
+
+    const parsed = await readJsonFile(file);
+
+    if (!parsed.ok) {
+      setLocalError(parsed.errors.join("\n"));
+      setImported([]);
+      return;
+    }
+
+    void importInput(parsed.input);
+  }
+
+  async function publishVersion(questionnaireId: string, versionId: string) {
+    setPublishingVersionId(versionId);
+    setLocalError("");
+
+    try {
+      await onPublishVersion(questionnaireId, versionId);
+      onRefresh();
+    } catch (publishError) {
+      setLocalError(
+        publishError instanceof Error ? publishError.message : "Не удалось опубликовать выбранную версию.",
+      );
+    } finally {
+      setPublishingVersionId("");
+    }
+  }
+
+  async function openAsOperator(questionnaireId: string) {
+    setOpeningQuestionnaireId(questionnaireId);
+    setLocalError("");
+
+    try {
+      await onOpenAsOperator(questionnaireId);
+    } catch (openError) {
+      setLocalError(openError instanceof Error ? openError.message : "Не удалось открыть сценарий как оператор.");
+    } finally {
+      setOpeningQuestionnaireId("");
+    }
+  }
+
+  return (
+    <main className="app-shell">
+      <BrandHeader
+        subtitle="Управление сценариями"
+        navigationItems={navigationItems}
+        user={user}
+        settings={settings}
+        settingsStatus={settingsStatus}
+        onSettingsChange={onSettingsChange}
+        onOpenProfile={onOpenProfile}
+        onLogout={onLogout}
+      />
+
+      <section className="admin-questionnaires-page">
+        <div className="admin-users-hero">
+          <div>
+            <p className="page-kicker">Администрирование</p>
+            <h1>Сценарии из 1С</h1>
+            <p>
+              Здесь администратор загружает выгрузку из 1С, проверяет версии и выбирает, какой сценарий будет
+              доступен операторам в рабочем месте.
+            </p>
+          </div>
+
+          <div className="admin-users-metrics">
+            <AdminMetric label="Сценариев" value={questionnaires.length} />
+            <AdminMetric label="Версий" value={questionnaires.reduce((sum, item) => sum + item.versions.length, 0)} />
+            <AdminMetric label="В работе" value={questionnaires.filter((item) => !item.archived).length} />
+          </div>
+        </div>
+
+        <div className="admin-questionnaires-grid">
+          <section className="admin-questionnaire-upload">
+            <div className="admin-questionnaire-section-header">
+              <div>
+                <p className="page-kicker">Загрузка</p>
+                <h2>Добавить выгрузку из 1С</h2>
+              </div>
+              <span>Проверка перед сохранением</span>
+            </div>
+
+            <div className="admin-questionnaire-upload-actions">
+              <input
+                ref={fileInputRef}
+                className="visually-hidden"
+                type="file"
+                accept=".json,application/json"
+                onChange={(event) => {
+                  void importFromFile(event.target.files?.[0]);
+                  event.target.value = "";
+                }}
+              />
+              <button type="button" className="primary-button" onClick={() => fileInputRef.current?.click()}>
+                Выбрать JSON-файл
+              </button>
+              <button type="button" className="secondary-button" onClick={importFromText} disabled={importStatus === "loading"}>
+                {importStatus === "loading" ? "Загружаем..." : "Загрузить из текста"}
+              </button>
+            </div>
+
+            <label className="admin-questionnaire-textarea-label">
+              <span>JSON из 1С</span>
+              <textarea
+                className="admin-questionnaire-textarea"
+                value={jsonText}
+                onChange={(event) => setJsonText(event.target.value)}
+                placeholder="Вставьте сюда содержимое файла из 1С, если не хотите выбирать файл."
+              />
+            </label>
+          </section>
+
+          <aside className="admin-questionnaire-help">
+            <p className="page-kicker">Перед публикацией</p>
+            <h2>Что проверяем</h2>
+            <ul>
+              <li>Структуру JSON и версию схемы.</li>
+              <li>Вопросы, разделы и варианты ответов.</li>
+              <li>Переходы на существующие вопросы.</li>
+              <li>Поддержку одиночного файла и набора сценариев.</li>
+            </ul>
+            <p>После загрузки новая версия появится в списке ниже. При необходимости её можно опубликовать повторно.</p>
+          </aside>
+        </div>
+
+        {(error || localError) && (
+          <div className="notice-block admin-questionnaires-notice">
+            {(localError || error).split("\n").map((line) => (
+              <p key={line}>{line}</p>
+            ))}
+          </div>
+        )}
+
+        {imported.length > 0 && (
+          <div className="admin-questionnaires-import-result">
+            <p className="page-kicker">Загружено</p>
+            <h2>Новые версии добавлены в базу</h2>
+            <div>
+              {imported.map((item) => (
+                <span key={item.versionId}>
+                  {item.title}: версия {item.version}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="admin-users-toolbar admin-questionnaires-toolbar">
+          <label className="runs-search">
+            <span>Найти сценарий</span>
+            <input
+              type="search"
+              value={searchText}
+              onChange={(event) => setSearchText(event.target.value)}
+              placeholder="Название, код или номер версии"
+            />
+          </label>
+
+          <button type="button" className="secondary-button runs-refresh-button" onClick={onRefresh} disabled={isLoading}>
+            {isLoading ? "Обновляем..." : "Обновить"}
+          </button>
+        </div>
+
+        {isLoading && questionnaires.length === 0 && (
+          <div className="runs-empty-card">
+            <p className="page-kicker">Загрузка</p>
+            <h2>Получаем сценарии из базы</h2>
+            <p>Проверяем сохранённые опросники и их версии.</p>
+          </div>
+        )}
+
+        {!isLoading && filteredQuestionnaires.length === 0 && (
+          <div className="runs-empty-card">
+            <p className="page-kicker">Пока пусто</p>
+            <h2>Сценариев в базе нет</h2>
+            <p>Загрузите JSON из 1С через блок выше. После этого сценарий появится здесь.</p>
+          </div>
+        )}
+
+        {filteredQuestionnaires.length > 0 && (
+          <div className="admin-questionnaire-list">
+            {filteredQuestionnaires.map((questionnaire) => (
+              <article key={questionnaire.id} className="admin-questionnaire-card">
+                <div className="admin-questionnaire-card-header">
+                  <div>
+                    <span className={`run-status ${questionnaire.archived ? "draft" : "finished"}`}>
+                      {questionnaire.archived ? "В архиве" : "Доступен"}
+                    </span>
+                    <h2>{questionnaire.title}</h2>
+                    <p>Код сценария: {questionnaire.id}</p>
+                  </div>
+                  <div className="admin-questionnaire-card-meta">
+                    <span>Версий: {questionnaire.versions.length}</span>
+                    <span>Обновлён: {formatDateTime(questionnaire.updatedAt)}</span>
+                  </div>
+                </div>
+
+                <div className="admin-questionnaire-current-state">
+                  <div>
+                    <span className="page-kicker">Состояние для оператора</span>
+                    <strong>
+                      {questionnaire.activeVersionId
+                        ? "Сценарий виден операторам"
+                        : "Нет опубликованной версии"}
+                    </strong>
+                  </div>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    disabled={!questionnaire.activeVersionId || openingQuestionnaireId === questionnaire.id}
+                    onClick={() => void openAsOperator(questionnaire.id)}
+                  >
+                    {openingQuestionnaireId === questionnaire.id ? "Открываем..." : "Открыть как оператор"}
+                  </button>
+                </div>
+
+                <div className="admin-questionnaire-versions">
+                  {questionnaire.versions.map((version) => {
+                    const isCurrent = version.id === questionnaire.activeVersionId;
+                    const isPublishing = publishingVersionId === version.id;
+
+                    return (
+                      <div key={version.id} className={`admin-questionnaire-version ${isCurrent ? "current" : ""}`}>
+                        <div>
+                          <strong>Версия {version.version}</strong>
+                          <span>{formatDateTime(version.importedAt)}</span>
+                        </div>
+                        <div className="admin-questionnaire-version-badges">
+                          {isCurrent && <span className="status-badge status-active">Сейчас у операторов</span>}
+                          {version.published && <span className="status-badge">Опубликована</span>}
+                        </div>
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          disabled={isCurrent || isPublishing}
+                          onClick={() => void publishVersion(questionnaire.id, version.id)}
+                        >
+                          {isPublishing ? "Публикуем..." : isCurrent ? "Уже выбрана" : "Опубликовать"}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+    </main>
+  );
+}
+
+function AdminMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function filterQuestionnaires(questionnaires: AdminQuestionnaire[], searchText: string): AdminQuestionnaire[] {
+  const normalizedSearch = searchText.trim().toLowerCase();
+
+  if (!normalizedSearch) {
+    return questionnaires;
+  }
+
+  return questionnaires.filter((questionnaire) => {
+    const haystack = [
+      questionnaire.id,
+      questionnaire.title,
+      ...questionnaire.versions.map((version) => String(version.version)),
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    return haystack.includes(normalizedSearch);
+  });
+}
+
+function formatDateTime(value: string): string {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "дата не указана";
+  }
+
+  return date.toLocaleString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}

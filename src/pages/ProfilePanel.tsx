@@ -1,14 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
-import type { CurrentUser, UpdateProfileInput, UserPreferences } from "../shared/api/backendApi";
+import type {
+  ChangePasswordInput,
+  CurrentUser,
+  UpdateProfileInput,
+  UserPreferences,
+} from "../shared/api/backendApi";
 
 interface ProfilePanelProps {
   user: CurrentUser;
   onClose: () => void;
   onSave: (input: UpdateProfileInput) => Promise<void>;
+  onChangePassword: (input: ChangePasswordInput) => Promise<void>;
 }
 
-const maxProfileImageSize = 900 * 1024;
+const maxProfileImageSize = 10 * 1024 * 1024;
 
 const profileIconOptions: Array<{
   value: UserPreferences["profileIcon"];
@@ -33,7 +39,7 @@ const profileColorOptions: Array<{
   { value: "rose", label: "Акцентный" },
 ];
 
-export function ProfilePanel({ user, onClose, onSave }: ProfilePanelProps) {
+export function ProfilePanel({ user, onClose, onSave, onChangePassword }: ProfilePanelProps) {
   const [fullName, setFullName] = useState(user.fullName);
   const [email, setEmail] = useState(user.email);
   const [phone, setPhone] = useState(user.phone);
@@ -43,6 +49,11 @@ export function ProfilePanel({ user, onClose, onSave }: ProfilePanelProps) {
   const [avatarImage, setAvatarImage] = useState(user.preferences.avatarImage);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [error, setError] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [repeatPassword, setRepeatPassword] = useState("");
+  const [passwordStatus, setPasswordStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [passwordError, setPasswordError] = useState("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const activeIcon = profileIconOptions.find((option) => option.value === profileIcon) ?? profileIconOptions[0];
@@ -79,7 +90,7 @@ export function ProfilePanel({ user, onClose, onSave }: ProfilePanelProps) {
     }
 
     if (file.size > maxProfileImageSize) {
-      setError("Картинка слишком большая. Выберите файл до 900 КБ.");
+      setError("Картинка слишком большая. Выберите файл до 10 МБ.");
       return;
     }
 
@@ -108,6 +119,48 @@ export function ProfilePanel({ user, onClose, onSave }: ProfilePanelProps) {
 
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
+    }
+  }
+
+  async function handlePasswordChange() {
+    setPasswordStatus("idle");
+    setPasswordError("");
+
+    if (!currentPassword || !newPassword || !repeatPassword) {
+      setPasswordStatus("error");
+      setPasswordError("Заполните текущий пароль и новый пароль дважды.");
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      setPasswordStatus("error");
+      setPasswordError("Новый пароль должен быть не короче 8 символов.");
+      return;
+    }
+
+    if (newPassword !== repeatPassword) {
+      setPasswordStatus("error");
+      setPasswordError("Новый пароль и повтор не совпадают.");
+      return;
+    }
+
+    if (currentPassword === newPassword) {
+      setPasswordStatus("error");
+      setPasswordError("Новый пароль должен отличаться от текущего.");
+      return;
+    }
+
+    setPasswordStatus("saving");
+
+    try {
+      await onChangePassword({ currentPassword, newPassword });
+      setCurrentPassword("");
+      setNewPassword("");
+      setRepeatPassword("");
+      setPasswordStatus("saved");
+    } catch (changeError) {
+      setPasswordStatus("error");
+      setPasswordError(changeError instanceof Error ? changeError.message : "Не удалось сменить пароль.");
     }
   }
 
@@ -222,6 +275,67 @@ export function ProfilePanel({ user, onClose, onSave }: ProfilePanelProps) {
             </div>
           </section>
 
+          <section className="profile-section-card profile-password-card">
+            <div className="profile-section-heading">
+              <div>
+                <span>Безопасность</span>
+                <h3>Смена пароля</h3>
+              </div>
+              <small>Если браузер ругается на пароль, смените его здесь</small>
+            </div>
+
+            <div className="profile-fields-grid profile-password-grid">
+              <label>
+                <span>Текущий пароль</span>
+                <input
+                  className="field"
+                  type="password"
+                  value={currentPassword}
+                  onChange={(event) => setCurrentPassword(event.target.value)}
+                  autoComplete="current-password"
+                />
+              </label>
+
+              <label>
+                <span>Новый пароль</span>
+                <input
+                  className="field"
+                  type="password"
+                  value={newPassword}
+                  onChange={(event) => setNewPassword(event.target.value)}
+                  autoComplete="new-password"
+                />
+              </label>
+
+              <label>
+                <span>Повторите новый пароль</span>
+                <input
+                  className="field"
+                  type="password"
+                  value={repeatPassword}
+                  onChange={(event) => setRepeatPassword(event.target.value)}
+                  autoComplete="new-password"
+                />
+              </label>
+            </div>
+
+            {passwordStatus === "saved" && (
+              <div className="profile-save-success">Пароль изменён. Используйте его при следующем входе.</div>
+            )}
+            {passwordError && <div className="validation-error">{passwordError}</div>}
+
+            <div className="profile-password-actions">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={handlePasswordChange}
+                disabled={passwordStatus === "saving"}
+              >
+                {passwordStatus === "saving" ? "Меняем пароль..." : "Сменить пароль"}
+              </button>
+            </div>
+          </section>
+
           <details className="profile-settings-details">
             <summary>
               <div>
@@ -243,7 +357,7 @@ export function ProfilePanel({ user, onClose, onSave }: ProfilePanelProps) {
                     <span>Картинка</span>
                     <h3>Своя картинка профиля</h3>
                   </div>
-                  <small>До 900 КБ</small>
+                  <small>До 10 МБ</small>
                 </div>
 
                 <div className="profile-image-row">
@@ -284,28 +398,41 @@ export function ProfilePanel({ user, onClose, onSave }: ProfilePanelProps) {
                 </div>
               </section>
 
-              <section className="profile-image-card">
+              {!avatarImage && (
+                <section className="profile-image-card">
+                  <div className="profile-section-heading">
+                    <div>
+                      <span>Запасной вариант</span>
+                      <h3>Готовая иконка</h3>
+                    </div>
+                    <small>Используется без своей картинки</small>
+                  </div>
+
+                  <div className="profile-icon-grid">
+                    {profileIconOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        className={`profile-icon-choice${option.value === profileIcon ? " active" : ""}`}
+                        aria-pressed={option.value === profileIcon}
+                        onClick={() => setProfileIcon(option.value)}
+                      >
+                        <span className={`operator-avatar profile-color-${profileColor}`}>{option.symbol}</span>
+                        <strong>{option.label}</strong>
+                      </button>
+                    ))}
+                  </div>
+
+                </section>
+              )}
+
+              <section className="profile-image-card profile-color-card">
                 <div className="profile-section-heading">
                   <div>
-                    <span>Запасной вариант</span>
-                    <h3>Готовая иконка</h3>
+                    <span>Цвет профиля</span>
+                    <h3>{avatarImage ? "Обводка картинки" : "Цвет готовой иконки"}</h3>
                   </div>
-                  <small>Используется без своей картинки</small>
-                </div>
-
-                <div className="profile-icon-grid">
-                  {profileIconOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      className={`profile-icon-choice${option.value === profileIcon ? " active" : ""}`}
-                      aria-pressed={option.value === profileIcon}
-                      onClick={() => setProfileIcon(option.value)}
-                    >
-                      <span className={`operator-avatar profile-color-${profileColor}`}>{option.symbol}</span>
-                      <strong>{option.label}</strong>
-                    </button>
-                  ))}
+                  <small>Применяется в шапке</small>
                 </div>
 
                 <div className="profile-color-row">

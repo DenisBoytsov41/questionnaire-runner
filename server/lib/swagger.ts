@@ -3,7 +3,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { sendHtml, sendJson } from "./http.js";
 
 const swaggerUser = process.env.SWAGGER_USER ?? "admin";
-const swaggerPassword = process.env.SWAGGER_PASSWORD ?? "admin123";
+const swaggerPassword = process.env.SWAGGER_PASSWORD ?? "KService-Docs-2026!";
 
 export function isSwaggerAuthorized(req: IncomingMessage): boolean {
   const authorization = req.headers.authorization;
@@ -131,7 +131,7 @@ const openApiDocument = {
         required: ["login", "password"],
         properties: {
           login: { type: "string", example: "admin" },
-          password: { type: "string", example: "admin123" },
+          password: { type: "string", example: "KService-Admin-2026!" },
         },
       },
       User: {
@@ -158,7 +158,7 @@ const openApiDocument = {
           profileColor: { type: "string", enum: ["teal", "mint", "blue", "amber", "rose"] },
           avatarImage: {
             type: "string",
-            description: "Картинка профиля в формате data URL или пустая строка.",
+            description: "Картинка профиля в формате data URL или пустая строка. Файл изображения может быть до 10 МБ.",
           },
         },
       },
@@ -170,6 +170,14 @@ const openApiDocument = {
           phone: { type: "string", example: "+7 900 000-00-00" },
           position: { type: "string", example: "Оператор первой линии" },
           preferences: { $ref: "#/components/schemas/UserPreferences" },
+        },
+      },
+      ChangePasswordRequest: {
+        type: "object",
+        required: ["currentPassword", "newPassword"],
+        properties: {
+          currentPassword: { type: "string", example: "текущий-пароль" },
+          newPassword: { type: "string", minLength: 8, maxLength: 128, example: "KService-New-2026!" },
         },
       },
       LoginResponse: {
@@ -195,6 +203,30 @@ const openApiDocument = {
             description: "true - вход открыт, false - вход временно закрыт.",
             example: true,
           },
+        },
+      },
+      CreateAdminUserRequest: {
+        type: "object",
+        required: ["login", "password", "fullName"],
+        description: "Создание сотрудника администратором. По умолчанию создаётся оператор с открытым входом.",
+        properties: {
+          login: { type: "string", minLength: 3, example: "ivanov" },
+          password: { type: "string", minLength: 6, example: "temporary-password" },
+          fullName: { type: "string", example: "Иванов Иван" },
+          role: {
+            type: "string",
+            enum: ["user", "operator", "admin"],
+            default: "operator",
+            description: "user - без доступа, operator - оператор, admin - администратор.",
+          },
+          active: {
+            type: "boolean",
+            default: true,
+            description: "true - вход открыт сразу после создания.",
+          },
+          position: { type: "string", example: "Оператор первой линии" },
+          email: { type: "string", example: "operator@k-service44.ru" },
+          phone: { type: "string", example: "+7 900 000-00-00" },
         },
       },
       PublishQuestionnaireRequest: {
@@ -299,6 +331,20 @@ const openApiDocument = {
         },
       },
     },
+    "/api/me/password": {
+      patch: {
+        tags: ["Вход"],
+        security: [{ bearerAuth: [] }],
+        summary: "Сменить пароль текущего пользователя",
+        requestBody: jsonBody("#/components/schemas/ChangePasswordRequest"),
+        responses: {
+          200: response("Пароль изменён", { changed: { type: "boolean" } }),
+          401: errorResponse("Нужно войти"),
+          403: errorResponse("Текущий пароль указан неверно"),
+          409: errorResponse("Новый пароль должен отличаться от текущего"),
+        },
+      },
+    },
     "/api/users": {
       get: {
         tags: ["Пользователи"],
@@ -309,6 +355,44 @@ const openApiDocument = {
             users: { type: "array", items: { $ref: "#/components/schemas/User" } },
           }),
           403: errorResponse("Недостаточно прав"),
+        },
+      },
+    },
+    "/api/admin/users": {
+      post: {
+        tags: ["Пользователи"],
+        security: [{ bearerAuth: [] }],
+        summary: "Создать сотрудника, только администратор",
+        description: "Администратор создаёт учётную запись, задаёт временный пароль и сразу назначает роль: без доступа, оператор или администратор.",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/CreateAdminUserRequest" },
+              examples: {
+                operator: {
+                  summary: "Создать оператора",
+                  value: {
+                    login: "ivanov",
+                    password: "temporary-password",
+                    fullName: "Иванов Иван",
+                    role: "operator",
+                    active: true,
+                    position: "Оператор первой линии",
+                    email: "operator@k-service44.ru",
+                    phone: "+7 900 000-00-00",
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          201: response("Сотрудник создан", { user: { $ref: "#/components/schemas/User" } }),
+          400: errorResponse("Данные заполнены некорректно"),
+          401: errorResponse("Нужно войти"),
+          403: errorResponse("Недостаточно прав"),
+          409: errorResponse("Пользователь с таким логином уже есть"),
         },
       },
     },
@@ -350,6 +434,7 @@ const openApiDocument = {
           401: errorResponse("Нужно войти"),
           403: errorResponse("Недостаточно прав"),
           404: errorResponse("Пользователь не найден"),
+          409: errorResponse("Нельзя менять роль своей учётной записи"),
         },
       },
     },
@@ -393,6 +478,19 @@ const openApiDocument = {
         responses: {
           201: response("Импорт выполнен", { imported: { type: "array", items: { type: "object" } } }),
           400: errorResponse("Файл не прошёл проверку"),
+        },
+      },
+    },
+    "/api/admin/questionnaires": {
+      get: {
+        tags: ["Опросники"],
+        security: [{ bearerAuth: [] }],
+        summary: "Список всех загруженных опросников и версий, только администратор",
+        responses: {
+          200: response("Опросники и версии", {
+            questionnaires: { type: "array", items: { type: "object" } },
+          }),
+          403: errorResponse("Недостаточно прав"),
         },
       },
     },
@@ -454,6 +552,18 @@ const openApiDocument = {
         responses: {
           200: response("Прохождение", { run: { $ref: "#/components/schemas/QuestionnaireRun" } }),
           404: errorResponse("Прохождение не найдено"),
+        },
+      },
+      delete: {
+        tags: ["Прохождения"],
+        security: [{ bearerAuth: [] }],
+        summary: "Удалить черновик прохождения",
+        parameters: [pathParameter("id", "Идентификатор прохождения")],
+        responses: {
+          200: response("Черновик удалён", { deleted: { type: "boolean" } }),
+          403: errorResponse("Нет доступа к этому прохождению"),
+          404: errorResponse("Прохождение не найдено"),
+          409: errorResponse("Удалить можно только черновик"),
         },
       },
     },

@@ -1,17 +1,20 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import type {
   AdminUser,
+  CreateAdminUserInput,
   CurrentUser,
   UserPreferences,
   UserRole,
 } from "../shared/api/backendApi";
 import { BrandHeader, type HeaderNavigationItem, type SettingsStatus } from "../shared/ui/BrandHeader";
+import { RoundedSelect } from "../shared/ui/RoundedSelect";
 
 interface AdminUsersPageProps {
   users: AdminUser[];
   status: "loading" | "ready" | "error";
   error: string;
   onRefresh: () => void;
+  onCreateUser: (input: CreateAdminUserInput) => Promise<void>;
   onUpdateUser: (userId: string, input: { role: UserRole; active: boolean }) => Promise<void>;
   navigationItems?: HeaderNavigationItem[];
   user: CurrentUser;
@@ -45,6 +48,7 @@ export function AdminUsersPage({
   status,
   error,
   onRefresh,
+  onCreateUser,
   onUpdateUser,
   navigationItems,
   user,
@@ -57,6 +61,18 @@ export function AdminUsersPage({
   const [roleFilter, setRoleFilter] = useState<"all" | UserRole>("all");
   const [searchText, setSearchText] = useState("");
   const [savingUserId, setSavingUserId] = useState("");
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
+  const [createSuccess, setCreateSuccess] = useState("");
+  const [createForm, setCreateForm] = useState<CreateAdminUserInput>({
+    fullName: "",
+    login: "",
+    password: "",
+    position: "Оператор первой линии",
+    email: "",
+    phone: "",
+    role: "operator",
+    active: true,
+  });
   const [localError, setLocalError] = useState("");
   const isLoading = status === "loading";
 
@@ -83,6 +99,48 @@ export function AdminUsersPage({
     }
   }
 
+  async function createEmployee(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLocalError("");
+    setCreateSuccess("");
+
+    if (!createForm.fullName.trim() || !createForm.login.trim() || !createForm.password.trim()) {
+      setLocalError("Заполните ФИО, логин и пароль нового сотрудника.");
+      return;
+    }
+
+    setIsCreatingUser(true);
+
+    try {
+      await onCreateUser({
+        ...createForm,
+        fullName: createForm.fullName.trim(),
+        login: createForm.login.trim(),
+        password: createForm.password,
+        position: createForm.position?.trim(),
+        email: createForm.email?.trim(),
+        phone: createForm.phone?.trim(),
+      });
+      setCreateSuccess("Сотрудник создан. Он уже может войти под своим логином и паролем.");
+      setCreateForm({
+        fullName: "",
+        login: "",
+        password: "",
+        position: "Оператор первой линии",
+        email: "",
+        phone: "",
+        role: "operator",
+        active: true,
+      });
+    } catch (createError) {
+      setLocalError(
+        createError instanceof Error ? createError.message : "Не удалось создать сотрудника.",
+      );
+    } finally {
+      setIsCreatingUser(false);
+    }
+  }
+
   return (
     <main className="app-shell">
       <BrandHeader
@@ -103,7 +161,7 @@ export function AdminUsersPage({
             <h1>Пользователи и доступ</h1>
             <p>
               Здесь администратор назначает роль сотрудника и может временно закрыть вход.
-              Новая учётная запись сначала получает статус “без доступа”, пока ей не назначат роль.
+              Нового оператора можно создать сразу с временным паролем и открытым доступом.
             </p>
           </div>
 
@@ -149,6 +207,121 @@ export function AdminUsersPage({
             {isLoading ? "Обновляем..." : "Обновить"}
           </button>
         </div>
+
+        <form className="admin-user-create-card" onSubmit={createEmployee}>
+          <div className="admin-user-create-header">
+            <div>
+              <p className="page-kicker">Новый сотрудник</p>
+              <h2>Создать оператора</h2>
+              <p>
+                Заполните данные для входа, задайте временный пароль и выберите, будет ли доступ открыт сразу.
+              </p>
+            </div>
+
+            <span className="admin-user-create-badge">Создаётся в базе</span>
+          </div>
+
+          <div className="admin-user-create-layout">
+            <div className="admin-user-create-fields">
+              <div className="admin-user-create-grid">
+                <label>
+                  <span>ФИО</span>
+                  <input
+                    value={createForm.fullName}
+                    onChange={(event) => setCreateForm((current) => ({ ...current, fullName: event.target.value }))}
+                    placeholder="Иванов Иван"
+                    autoComplete="name"
+                  />
+                </label>
+
+                <label>
+                  <span>Логин</span>
+                  <input
+                    value={createForm.login}
+                    onChange={(event) => setCreateForm((current) => ({ ...current, login: event.target.value }))}
+                    placeholder="ivanov"
+                    autoComplete="username"
+                  />
+                </label>
+
+                <label>
+                  <span>Временный пароль</span>
+                  <input
+                    type="password"
+                    value={createForm.password}
+                    onChange={(event) => setCreateForm((current) => ({ ...current, password: event.target.value }))}
+                    placeholder="Не меньше 6 символов"
+                    autoComplete="new-password"
+                  />
+                </label>
+
+                <label>
+                  <span>Должность</span>
+                  <input
+                    value={createForm.position}
+                    onChange={(event) => setCreateForm((current) => ({ ...current, position: event.target.value }))}
+                    placeholder="Оператор первой линии"
+                    autoComplete="organization-title"
+                  />
+                </label>
+
+                <label>
+                  <span>Электронная почта</span>
+                  <input
+                    type="email"
+                    value={createForm.email}
+                    onChange={(event) => setCreateForm((current) => ({ ...current, email: event.target.value }))}
+                    placeholder="operator@k-service44.ru"
+                    autoComplete="email"
+                  />
+                </label>
+
+                <label>
+                  <span>Телефон</span>
+                  <input
+                    value={createForm.phone}
+                    onChange={(event) => setCreateForm((current) => ({ ...current, phone: event.target.value }))}
+                    placeholder="+7 900 000-00-00"
+                    autoComplete="tel"
+                  />
+                </label>
+              </div>
+            </div>
+
+            <aside className="admin-user-create-side" aria-label="Доступ нового сотрудника">
+              <div className="admin-user-create-side-card">
+                <label>
+                  <span>Роль</span>
+                  <RoundedSelect
+                    value={createForm.role}
+                    options={roleOptions}
+                    ariaLabel="Роль нового сотрудника"
+                    onChange={(role) => setCreateForm((current) => ({ ...current, role }))}
+                  />
+                </label>
+
+                <label className="admin-user-create-switch">
+                  <input
+                    type="checkbox"
+                    checked={createForm.active}
+                    onChange={(event) => setCreateForm((current) => ({ ...current, active: event.target.checked }))}
+                  />
+                  <span>Сразу открыть вход</span>
+                </label>
+              </div>
+
+              <button type="submit" className="primary-button admin-user-create-submit" disabled={isCreatingUser}>
+                {isCreatingUser ? "Создаём..." : "Создать сотрудника"}
+              </button>
+
+              <p className="admin-user-create-hint">
+                После создания сотрудник сможет войти по логину и временному паролю. Роль можно изменить ниже в списке.
+              </p>
+            </aside>
+          </div>
+
+          {createSuccess && <p className="admin-user-create-success">{createSuccess}</p>}
+        </form>
 
         {(error || localError) && (
           <div className="notice-block">
@@ -204,17 +377,14 @@ export function AdminUsersPage({
                   <div className="admin-user-access">
                     <label>
                       <span>Роль</span>
-                      <select
+                      <RoundedSelect
                         value={employee.role}
-                        disabled={isSaving}
-                        onChange={(event) => updateAccess(employee, { role: event.target.value as UserRole })}
-                      >
-                        {roleOptions.map((role) => (
-                          <option key={role.value} value={role.value}>
-                            {role.label}
-                          </option>
-                        ))}
-                      </select>
+                        disabled={isSaving || isSelf}
+                        options={roleOptions}
+                        ariaLabel={`Роль сотрудника ${employee.fullName || employee.login}`}
+                        onChange={(role) => updateAccess(employee, { role })}
+                        title={isSelf ? "Свою роль нельзя менять из этой страницы." : undefined}
+                      />
                     </label>
 
                     <button

@@ -45,9 +45,25 @@ export type UpdateProfileInput = Partial<{
   preferences: UserPreferences;
 }>;
 
+export type ChangePasswordInput = {
+  currentPassword: string;
+  newPassword: string;
+};
+
 export type UpdateUserAccessInput = {
   role: UserRole;
   active: boolean;
+};
+
+export type CreateAdminUserInput = {
+  login: string;
+  password: string;
+  fullName: string;
+  role: UserRole;
+  active: boolean;
+  position?: string;
+  email?: string;
+  phone?: string;
 };
 
 export type PublishedQuestionnaire = {
@@ -63,6 +79,34 @@ export type PublishedQuestionnaireDetails = {
   title: string;
   version: number;
   source: unknown;
+};
+
+export type AdminQuestionnaireVersion = {
+  id: string;
+  questionnaireId: string;
+  version: number;
+  title: string;
+  active: boolean;
+  published: boolean;
+  importedBy: string;
+  importedAt: string;
+};
+
+export type AdminQuestionnaire = {
+  id: string;
+  title: string;
+  activeVersionId: string;
+  archived: boolean;
+  createdAt: string;
+  updatedAt: string;
+  versions: AdminQuestionnaireVersion[];
+};
+
+export type ImportQuestionnairesResult = {
+  questionnaireId: string;
+  versionId: string;
+  version: number;
+  title: string;
 };
 
 export type QuestionnaireRunStatus = "draft" | "finished";
@@ -123,12 +167,36 @@ export async function updateCurrentUserProfile(
   return result.user;
 }
 
+export async function changeCurrentUserPassword(
+  token: string,
+  input: ChangePasswordInput,
+): Promise<void> {
+  await apiRequest<{ changed: boolean }>("/api/me/password", {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(input),
+  });
+}
+
 export async function loadUsers(token: string): Promise<AdminUser[]> {
   const result = await apiRequest<{ users: AdminUser[] }>("/api/users", {
     token,
   });
 
   return result.users;
+}
+
+export async function createAdminUser(
+  token: string,
+  input: CreateAdminUserInput,
+): Promise<AdminUser> {
+  const result = await apiRequest<{ user: AdminUser }>("/api/admin/users", {
+    method: "POST",
+    token,
+    body: JSON.stringify(input),
+  });
+
+  return result.user;
 }
 
 export async function updateUserAccess(
@@ -165,6 +233,42 @@ export async function loadPublishedQuestionnaire(
   );
 
   return result.questionnaire;
+}
+
+export async function loadAdminQuestionnaires(token: string): Promise<AdminQuestionnaire[]> {
+  const result = await apiRequest<{ questionnaires: AdminQuestionnaire[] }>("/api/admin/questionnaires", {
+    token,
+  });
+
+  return result.questionnaires;
+}
+
+export async function importQuestionnairesToBackend(
+  token: string,
+  input: unknown,
+): Promise<ImportQuestionnairesResult[]> {
+  const result = await apiRequest<{ imported: ImportQuestionnairesResult[] }>("/api/admin/questionnaires/import", {
+    method: "POST",
+    token,
+    body: JSON.stringify(input),
+  });
+
+  return result.imported;
+}
+
+export async function publishAdminQuestionnaireVersion(
+  token: string,
+  questionnaireId: string,
+  versionId: string,
+): Promise<void> {
+  await apiRequest(
+    `/api/admin/questionnaires/${encodeURIComponent(questionnaireId)}/publish`,
+    {
+      method: "POST",
+      token,
+      body: JSON.stringify({ versionId }),
+    },
+  );
 }
 
 export async function createQuestionnaireRun(
@@ -225,6 +329,13 @@ export async function finishQuestionnaireRun(
   });
 
   return result.run;
+}
+
+export async function deleteQuestionnaireRunDraft(token: string, runId: string): Promise<void> {
+  await apiRequest(`/api/questionnaire-runs/${encodeURIComponent(runId)}`, {
+    method: "DELETE",
+    token,
+  });
 }
 
 async function apiRequest<TResponse>(

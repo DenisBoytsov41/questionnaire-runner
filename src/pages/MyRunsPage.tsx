@@ -14,6 +14,7 @@ interface MyRunsPageProps {
   error: string;
   onRefresh: () => void;
   onContinueRun: (run: QuestionnaireRun) => void;
+  onDeleteDraftRun: (run: QuestionnaireRun) => Promise<void>;
   onBackToCatalog: () => void;
   navigationItems?: HeaderNavigationItem[];
   user: CurrentUser;
@@ -31,6 +32,7 @@ export function MyRunsPage({
   error,
   onRefresh,
   onContinueRun,
+  onDeleteDraftRun,
   onBackToCatalog,
   navigationItems,
   user,
@@ -43,6 +45,8 @@ export function MyRunsPage({
   const [statusFilter, setStatusFilter] = useState<"all" | QuestionnaireRun["status"]>("all");
   const [searchText, setSearchText] = useState("");
   const [openedRunId, setOpenedRunId] = useState<string | null>(null);
+  const [deletingRunId, setDeletingRunId] = useState("");
+  const [localError, setLocalError] = useState("");
   const [copyStatus, setCopyStatus] = useState<{ runId: string; message: string; type: "success" | "error" } | null>(
     null,
   );
@@ -127,9 +131,9 @@ export function MyRunsPage({
           </button>
         </div>
 
-        {error && (
+        {(error || localError) && (
           <div className="notice-block">
-            <p>{error}</p>
+            <p>{localError || error}</p>
           </div>
         )}
 
@@ -195,6 +199,30 @@ export function MyRunsPage({
                         onClick={() => onContinueRun(run)}
                       >
                         Продолжить черновик
+                      </button>
+                    )}
+
+                    {run.status === "draft" && (
+                      <button
+                        type="button"
+                        className="secondary-button danger-soft-button"
+                        disabled={deletingRunId === run.id}
+                        onClick={async () => {
+                          setDeletingRunId(run.id);
+                          setLocalError("");
+
+                          try {
+                            await onDeleteDraftRun(run);
+                          } catch (deleteError) {
+                            setLocalError(
+                              deleteError instanceof Error ? deleteError.message : "Не удалось удалить черновик.",
+                            );
+                          } finally {
+                            setDeletingRunId("");
+                          }
+                        }}
+                      >
+                        {deletingRunId === run.id ? "Удаляем..." : "Удалить черновик"}
                       </button>
                     )}
 

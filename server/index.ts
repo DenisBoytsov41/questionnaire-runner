@@ -19,13 +19,17 @@ import {
 } from "./lib/http.js";
 import {
   checkDatabase,
+  changeUserPassword,
+  closeDatabase,
   createRun,
   createUser,
+  deleteDraftRun,
   findUserByLogin,
   finishRun,
   getPublishedQuestionnaire,
   getRunForUser,
   importQuestionnaireVersions,
+  listQuestionnairesForAdmin,
   listPublishedQuestionnaires,
   listRunsForUser,
   listUsers,
@@ -42,10 +46,11 @@ import {
   sendSwaggerUi,
   sendSwaggerUnauthorized,
 } from "./lib/swagger.js";
-import { attachRequestLogger, logInfo } from "./lib/logger.js";
+import { attachRequestLogger, logError, logInfo, logWarn } from "./lib/logger.js";
 
 const port = Number(process.env.PORT ?? 4100);
 const jwtSecret = process.env.JWT_SECRET ?? "dev-secret-change-me";
+const maxAvatarImagePayloadLength = 14_500_000;
 
 const registerSchema = z.object({
   login: z.string().trim().min(3),
@@ -53,9 +58,25 @@ const registerSchema = z.object({
   fullName: z.string().trim().min(2),
 });
 
+const createAdminUserSchema = z.object({
+  login: z.string().trim().min(3),
+  password: z.string().min(6),
+  fullName: z.string().trim().min(2),
+  email: z.string().trim().email().or(z.literal("")).optional(),
+  phone: z.string().trim().max(50).optional(),
+  position: z.string().trim().max(120).optional(),
+  role: z.enum(["user", "operator", "admin"]).default("operator"),
+  active: z.boolean().default(true),
+});
+
 const loginSchema = z.object({
   login: z.string().trim().min(1),
   password: z.string().min(1),
+});
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8).max(128),
 });
 
 const updateUserRoleSchema = z.object({
@@ -69,7 +90,7 @@ const userPreferencesSchema = z.object({
   readingMode: z.enum(["normal", "high-contrast"]).default("normal"),
   profileIcon: z.enum(["person", "headset", "shield", "star", "check"]).default("person"),
   profileColor: z.enum(["teal", "mint", "blue", "amber", "rose"]).default("teal"),
-  avatarImage: z.string().max(900_000).default(""),
+  avatarImage: z.string().max(maxAvatarImagePayloadLength).default(""),
 });
 
 const updateProfileSchema = z.object({
@@ -187,15 +208,41 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === "PATCH" && parts[1] === "me" && parts[2] === "password") {
+      const currentUser = requireUser(context);
+      const body = changePasswordSchema.parse(await readJsonBody(req));
+      await changeUserPassword({
+        userId: currentUser.id,
+        currentPassword: body.currentPassword,
+        newPassword: body.newPassword,
+      });
+
+      sendJson(res, 200, { changed: true });
+      return;
+    }
+
     if (req.method === "GET" && parts[1] === "users") {
       requireRole(context, ["admin"]);
       sendJson(res, 200, { users: await listUsers() });
       return;
     }
 
-    if (req.method === "PATCH" && parts[1] === "users" && parts[2]) {
+    if (req.method === "POST" && parts[1] === "admin" && parts[2] === "users") {
       requireRole(context, ["admin"]);
+      const body = createAdminUserSchema.parse(await readJsonBody(req));
+      const user = await createUser(body);
+      sendJson(res, 201, { user });
+      return;
+    }
+
+    if (req.method === "PATCH" && parts[1] === "users" && parts[2]) {
+      const admin = requireRole(context, ["admin"]);
       const body = updateUserRoleSchema.parse(await readJsonBody(req));
+
+      if (parts[2] === admin.id && body.role !== admin.role) {
+        throw new HttpError(409, "Нельзя менять роль своей учётной записи.");
+      }
+
       const user = await updateUserAdmin({
         userId: parts[2],
         role: body.role,
@@ -233,6 +280,12 @@ const server = createServer(async (req, res) => {
       const body = await readJsonBody(req);
       const result = await importQuestionnaires(body, admin.id);
       sendJson(res, 201, result);
+      return;
+    }
+
+    if (req.method === "GET" && parts[1] === "admin" && parts[2] === "questionnaires" && !parts[3]) {
+      requireRole(context, ["admin"]);
+      sendJson(res, 200, { questionnaires: await listQuestionnairesForAdmin() });
       return;
     }
 
@@ -314,6 +367,22 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === "DELETE" && parts[1] === "questionnaire-runs" && parts[2]) {
+      const user = requireRole(context, ["operator", "admin"]);
+      const deleted = await deleteDraftRun({
+        runId: parts[2],
+        userId: user.id,
+        role: user.role,
+      });
+
+      if (!deleted) {
+        throw new HttpError(404, "Прохождение не найдено.");
+      }
+
+      sendJson(res, 200, { deleted: true });
+      return;
+    }
+
     if (req.method === "GET" && parts[1] === "questionnaire-runs" && parts[2]) {
       const user = requireRole(context, ["operator", "admin"]);
       const run = await getRunForUser(parts[2], user.id, user.role);
@@ -355,6 +424,44 @@ server.listen(port, () => {
   logInfo("server", "Первый администратор создаётся автоматически, если таблица пользователей пустая");
   logInfo("server", "Логин и пароль администратора можно задать через ADMIN_LOGIN и ADMIN_PASSWORD");
 });
+
+let isShuttingDown = false;
+
+function shutdown(signal: NodeJS.Signals): void {
+  if (isShuttingDown) {
+    return;
+  }
+
+  isShuttingDown = true;
+  logInfo("server", "Получен сигнал остановки, закрываем backend", { signal });
+
+  const forceExitTimer = setTimeout(() => {
+    logWarn("server", "Backend не успел завершиться штатно, завершаем принудительно", { signal });
+    process.exit(1);
+  }, 10_000);
+  forceExitTimer.unref();
+
+  server.close((error) => {
+    if (error) {
+      logError("server", "Ошибка при остановке HTTP-сервера", { message: error.message });
+    }
+
+    closeDatabase()
+      .then(() => {
+        clearTimeout(forceExitTimer);
+        logInfo("server", "Backend остановлен штатно", { signal });
+        process.exit(error ? 1 : 0);
+      })
+      .catch((databaseError: Error) => {
+        clearTimeout(forceExitTimer);
+        logError("database", "Ошибка при закрытии соединений PostgreSQL", { message: databaseError.message });
+        process.exit(1);
+      });
+  });
+}
+
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);
 
 async function login(loginValue: string, password: string) {
   const user = await findUserByLogin(loginValue);
