@@ -646,6 +646,22 @@ export async function createRun(questionnaireId: string, operatorId: string): Pr
       return null;
     }
 
+    await client.query("select pg_advisory_xact_lock(hashtext($1))", [
+      `${operatorId}:${questionnaireId}:${item.activeVersionId}`,
+    ]);
+
+    const existingDraft = await client.query<QuestionnaireRunRow>(
+      runSelectSql(
+        "where operator_id = $1 and questionnaire_id = $2 and questionnaire_version_id = $3 and status = 'draft' order by updated_at desc limit 1",
+      ),
+      [operatorId, questionnaireId, item.activeVersionId],
+    );
+    const existingRun = existingDraft.rows[0] ? mapQuestionnaireRun(existingDraft.rows[0]) : null;
+
+    if (existingRun) {
+      return existingRun;
+    }
+
     const now = new Date().toISOString();
     const run: QuestionnaireRun = {
       id: createId("run"),

@@ -557,7 +557,7 @@ function App() {
       setSelectedQuestionnaire(parsed.data);
       setQuestionnaireSource("backend");
       setActiveRunId(run.id);
-      setActiveRunSnapshot(null);
+      setActiveRunSnapshot(run);
       setIsManualUploadOpen(false);
       setIsRunsPageOpen(false);
       setIsAdminUsersPageOpen(false);
