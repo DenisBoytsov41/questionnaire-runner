@@ -5257,9 +5257,15 @@ html[data-theme="dark"] .top-bar .view-menu .view-settings-button.active {
 
 /* Текст в шапке масштабируется вместе с рабочим местом, но без обратного уменьшения. */
 html[data-text-scale="large"] .top-bar .view-menu-toggle span,
-html[data-text-scale="large"] .top-bar .operator-profile-text strong,
-html[data-text-scale="large"] .top-bar .workplace-title strong {
+html[data-text-scale="large"] .top-bar .operator-profile-text strong {
   font-size: 15px;
+}
+
+html[data-text-scale="large"] .top-bar .workplace-title strong {
+  overflow: visible;
+  font-size: 20px;
+  text-overflow: clip;
+  white-space: normal;
 }
 
 html[data-text-scale="large"] .top-bar .view-menu-toggle small,
@@ -5273,9 +5279,15 @@ html[data-text-scale="large"] .top-bar .view-menu .view-settings-button {
 }
 
 html[data-text-scale="xlarge"] .top-bar .view-menu-toggle span,
-html[data-text-scale="xlarge"] .top-bar .operator-profile-text strong,
-html[data-text-scale="xlarge"] .top-bar .workplace-title strong {
+html[data-text-scale="xlarge"] .top-bar .operator-profile-text strong {
   font-size: 16px;
+}
+
+html[data-text-scale="xlarge"] .top-bar .workplace-title strong {
+  overflow: visible;
+  font-size: 22px;
+  text-overflow: clip;
+  white-space: normal;
 }
 
 html[data-text-scale="xlarge"] .top-bar .view-menu-toggle small,
