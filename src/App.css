@@ -3010,7 +3010,14 @@ html[data-vision="high-contrast"] .summary-header,
 html[data-vision="high-contrast"] .summary-panel,
 html[data-vision="high-contrast"] .summary-section-card,
 html[data-vision="high-contrast"] .questionnaire-card,
-html[data-vision="high-contrast"] .select-header {
+html[data-vision="high-contrast"] .select-header,
+html[data-vision="high-contrast"] .admin-users-hero,
+html[data-vision="high-contrast"] .admin-questionnaire-upload,
+html[data-vision="high-contrast"] .admin-questionnaire-help,
+html[data-vision="high-contrast"] .admin-questionnaire-card,
+html[data-vision="high-contrast"] .admin-questionnaire-current-state,
+html[data-vision="high-contrast"] .admin-questionnaire-version,
+html[data-vision="high-contrast"] .pagination-bar {
   border-width: 2px;
   box-shadow: none;
 }
@@ -3025,7 +3032,10 @@ html[data-vision="high-contrast"] .field,
 html[data-vision="high-contrast"] .answer-input,
 html[data-vision="high-contrast"] .answer-textarea,
 html[data-vision="high-contrast"] .json-textarea,
-html[data-vision="high-contrast"] .question-search-input {
+html[data-vision="high-contrast"] .question-search-input,
+html[data-vision="high-contrast"] .admin-questionnaire-textarea,
+html[data-vision="high-contrast"] .pagination-size-button,
+html[data-vision="high-contrast"] .pagination-button {
   border-width: 2px;
 }
 
@@ -3049,7 +3059,14 @@ html[data-theme="dark"][data-vision="high-contrast"] .summary-header,
 html[data-theme="dark"][data-vision="high-contrast"] .summary-panel,
 html[data-theme="dark"][data-vision="high-contrast"] .summary-section-card,
 html[data-theme="dark"][data-vision="high-contrast"] .questionnaire-card,
-html[data-theme="dark"][data-vision="high-contrast"] .select-header {
+html[data-theme="dark"][data-vision="high-contrast"] .select-header,
+html[data-theme="dark"][data-vision="high-contrast"] .admin-users-hero,
+html[data-theme="dark"][data-vision="high-contrast"] .admin-questionnaire-upload,
+html[data-theme="dark"][data-vision="high-contrast"] .admin-questionnaire-help,
+html[data-theme="dark"][data-vision="high-contrast"] .admin-questionnaire-card,
+html[data-theme="dark"][data-vision="high-contrast"] .admin-questionnaire-current-state,
+html[data-theme="dark"][data-vision="high-contrast"] .admin-questionnaire-version,
+html[data-theme="dark"][data-vision="high-contrast"] .pagination-bar {
   border-color: #54cfc5;
 }
 
@@ -6436,9 +6453,72 @@ html[data-theme="dark"] .pagination-button {
 html[data-theme="dark"] .pagination-size-button:hover,
 html[data-theme="dark"] .pagination-button:hover:not(:disabled),
 html[data-theme="dark"] .pagination-size-button.active {
-  border-color: var(--ks-accent);
-  background: rgba(33, 184, 172, 0.2);
-  color: var(--ks-accent);
+  border-color: #66d8cf;
+  background: #143f3a;
+  color: #eafffb;
+}
+
+html[data-theme="dark"] .pagination-page-indicator {
+  border: 1px solid #66d8cf;
+  background: #143f3a;
+  color: #eafffb;
+}
+
+html[data-theme="dark"] .status-active,
+html[data-theme="dark"] .run-status.finished {
+  background: rgba(134, 239, 172, 0.18);
+  color: #d9fbe2;
+}
+
+html[data-theme="dark"] .run-status.draft {
+  background: rgba(251, 191, 36, 0.18);
+  color: #fde68a;
+}
+
+html[data-theme="dark"] .admin-questionnaire-card-meta span,
+html[data-theme="dark"] .admin-questionnaire-version span,
+html[data-theme="dark"] .admin-questionnaire-section-header > span {
+  color: #d6ebe7;
+}
+
+html[data-theme="dark"] .admin-questionnaire-version .secondary-button:disabled {
+  border-color: rgba(214, 235, 231, 0.28);
+  background: rgba(214, 235, 231, 0.08);
+  color: #d6ebe7;
+  opacity: 0.72;
+}
+
+html[data-theme="dark"][data-vision="high-contrast"] .admin-users-hero,
+html[data-theme="dark"][data-vision="high-contrast"] .admin-questionnaire-upload,
+html[data-theme="dark"][data-vision="high-contrast"] .admin-questionnaire-help,
+html[data-theme="dark"][data-vision="high-contrast"] .admin-questionnaire-card,
+html[data-theme="dark"][data-vision="high-contrast"] .admin-questionnaire-current-state,
+html[data-theme="dark"][data-vision="high-contrast"] .admin-questionnaire-version,
+html[data-theme="dark"][data-vision="high-contrast"] .pagination-bar {
+  background: #061d1a;
+}
+
+html[data-theme="dark"][data-vision="high-contrast"] .admin-questionnaire-textarea,
+html[data-theme="dark"][data-vision="high-contrast"] .pagination-size-button,
+html[data-theme="dark"][data-vision="high-contrast"] .pagination-button,
+html[data-theme="dark"][data-vision="high-contrast"] .pagination-page-indicator {
+  border-color: #99fff7;
+  background: #082e2a;
+  color: #ffffff;
+}
+
+html[data-theme="dark"][data-vision="high-contrast"] .pagination-size-button.active,
+html[data-theme="dark"][data-vision="high-contrast"] .pagination-page-indicator {
+  border-color: #ffffff;
+  background: #54fff0;
+  color: #001f1d;
+}
+
+html[data-theme="dark"][data-vision="high-contrast"] .status-active,
+html[data-theme="dark"][data-vision="high-contrast"] .run-status.finished {
+  border: 1px solid #bbf7d0;
+  background: #bbf7d0;
+  color: #052e16;
 }
 
 @media (max-width: 760px) {
