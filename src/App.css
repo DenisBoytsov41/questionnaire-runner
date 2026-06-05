@@ -1344,6 +1344,7 @@ body {
 
 .question-card {
   min-height: 420px;
+  overflow: visible;
   padding: 34px 38px;
   border-radius: 16px;
 }
@@ -2337,13 +2338,13 @@ select {
 
 .rounded-select-menu {
   position: absolute;
-  z-index: 70;
+  z-index: 120;
   top: calc(100% + 8px);
   left: 0;
   right: 0;
   display: grid;
   gap: 6px;
-  max-height: 260px;
+  max-height: min(260px, 45vh);
   overflow-y: auto;
   border: 1px solid var(--ks-line);
   border-radius: 18px;
