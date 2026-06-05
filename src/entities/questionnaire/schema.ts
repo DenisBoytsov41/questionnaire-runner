@@ -51,6 +51,7 @@ export const questionnaireQuestionSchema = z.object({
   order: z.number(),
   active: z.boolean(),
   show_in_summary: z.boolean(),
+  start_node: z.boolean().default(false),
   options: z.array(questionnaireOptionSchema).optional(),
   rules: z.array(questionnaireRuleSchema).optional(),
 });

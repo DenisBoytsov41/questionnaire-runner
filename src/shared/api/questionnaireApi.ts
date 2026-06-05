@@ -4,6 +4,10 @@ import {
   type Questionnaire,
   type QuestionnaireInput,
 } from "../../entities/questionnaire/schema";
+import {
+  convertTreePackageToQuestionnaireInput,
+  questionnaireTreePackageSchema,
+} from "../../entities/questionnaire/treeFormat";
 import { validateQuestionnaireContract } from "../../entities/questionnaire/validation";
 
 export type QuestionnaireParseResult =
@@ -52,7 +56,7 @@ export function parseQuestionnaireJsonText(text: string): QuestionnaireParseResu
     };
   }
 
-  const parsed = questionnaireInputSchema.safeParse(rawData);
+  const parsed = parseSupportedQuestionnaireInput(rawData);
 
   if (!parsed.success) {
     return {
@@ -80,6 +84,22 @@ export function parseQuestionnaireJsonText(text: string): QuestionnaireParseResu
     input,
     questionnaires,
   };
+}
+
+function parseSupportedQuestionnaireInput(rawData: unknown) {
+  const legacyParsed = questionnaireInputSchema.safeParse(rawData);
+
+  if (legacyParsed.success) {
+    return legacyParsed;
+  }
+
+  const treeParsed = questionnaireTreePackageSchema.safeParse(rawData);
+
+  if (treeParsed.success) {
+    return questionnaireInputSchema.safeParse(convertTreePackageToQuestionnaireInput(treeParsed.data));
+  }
+
+  return legacyParsed;
 }
 
 export function readJsonFile(file: File): Promise<QuestionnaireParseResult> {

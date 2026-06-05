@@ -5,6 +5,10 @@ import {
   questionnaireInputSchema,
   validateQuestionnaireContract,
 } from "./lib/questionnaireContract.js";
+import {
+  convertTreePackageToQuestionnaireInput,
+  questionnaireTreePackageSchema,
+} from "./lib/questionnaireTreeFormat.js";
 import type { QuestionnaireRun, UserPreferences, UserRole } from "./types.js";
 import { signToken, toPublicUser, verifyPassword } from "./lib/crypto.js";
 import {
@@ -525,7 +529,7 @@ async function login(loginValue: string, password: string) {
 }
 
 async function importQuestionnaires(input: unknown, importedBy: string) {
-  const parsed = questionnaireInputSchema.safeParse(input);
+  const parsed = parseSupportedQuestionnaireInput(input);
 
   if (!parsed.success) {
     throw new HttpError(400, parsed.error.issues.map((issue) => issue.message).join("; "));
@@ -541,4 +545,20 @@ async function importQuestionnaires(input: unknown, importedBy: string) {
   return {
     imported: await importQuestionnaireVersions({ questionnaires, importedBy }),
   };
+}
+
+function parseSupportedQuestionnaireInput(input: unknown) {
+  const legacyParsed = questionnaireInputSchema.safeParse(input);
+
+  if (legacyParsed.success) {
+    return legacyParsed;
+  }
+
+  const treeParsed = questionnaireTreePackageSchema.safeParse(input);
+
+  if (treeParsed.success) {
+    return questionnaireInputSchema.safeParse(convertTreePackageToQuestionnaireInput(treeParsed.data));
+  }
+
+  return legacyParsed;
 }

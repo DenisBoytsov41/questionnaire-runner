@@ -16,10 +16,6 @@ export function validateQuestionnaireContract(questionnaire: Questionnaire): str
     );
   }
 
-  if (questionnaire.sections.length === 0) {
-    errors.push(`В опроснике "${questionnaire.title}" нет ни одного раздела.`);
-  }
-
   if (questionnaire.questions.length === 0) {
     errors.push(`В опроснике "${questionnaire.title}" нет ни одного вопроса.`);
   }
