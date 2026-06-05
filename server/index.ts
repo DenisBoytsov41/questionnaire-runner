@@ -413,7 +413,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && parts[1] === "questionnaire-runs" && !parts[2]) {
       const user = requireRole(context, ["operator", "admin"]);
       const page = await listRunsForUserPage(user.id, user.role, readRunListQuery(context.url));
-      sendJson(res, 200, { runs: page.items, pagination: page.pagination });
+      sendJson(res, 200, { runs: page.items, pagination: page.pagination, summary: page.summary });
       return;
     }
 

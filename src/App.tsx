@@ -23,6 +23,7 @@ import type {
   PaginationMeta,
   PublishedQuestionnaire,
   QuestionnaireRun,
+  QuestionnaireRunsSummary,
   UpdateProfileInput,
   UserPreferences,
   UserRole,
@@ -60,6 +61,12 @@ const emptyAdminQuestionnairesSummary: AdminQuestionnairesSummary = {
   totalQuestionnaires: 0,
   totalVersions: 0,
   activeQuestionnaires: 0,
+};
+
+const emptyRunsSummary: QuestionnaireRunsSummary = {
+  totalRuns: 0,
+  draftRuns: 0,
+  finishedRuns: 0,
 };
 
 const catalogInitialParams: Required<Pick<ListPageParams, "page" | "pageSize" | "search">> = {
@@ -113,6 +120,7 @@ function App() {
     ...emptyPagination,
     pageSize: runsInitialParams.pageSize,
   });
+  const [runsSummary, setRunsSummary] = useState<QuestionnaireRunsSummary>(emptyRunsSummary);
   const [runsStatus, setRunsStatus] = useState<"loading" | "ready" | "error">("loading");
   const [runsError, setRunsError] = useState("");
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
@@ -268,9 +276,11 @@ function App() {
       const page = await loadQuestionnaireRunsPage(authToken, runsParams);
       setRuns(page.items);
       setRunsPagination(page.pagination);
+      setRunsSummary(page.summary);
       setRunsStatus("ready");
     } catch (error) {
       setRuns([]);
+      setRunsSummary(emptyRunsSummary);
       setRunsStatus("error");
       setRunsError(error instanceof Error ? error.message : "Не удалось получить список прохождений.");
     }
@@ -348,10 +358,12 @@ function App() {
       .then((page) => {
         setRuns(page.items);
         setRunsPagination(page.pagination);
+        setRunsSummary(page.summary);
         setRunsStatus("ready");
       })
       .catch((error) => {
         setRuns([]);
+        setRunsSummary(emptyRunsSummary);
         setRunsStatus("error");
         setRunsError(error instanceof Error ? error.message : "РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РїСЂРѕС…РѕР¶РґРµРЅРёР№.");
       });
@@ -680,6 +692,7 @@ function App() {
     setAuthError("");
     setPublishedQuestionnaires([]);
     setRuns([]);
+    setRunsSummary(emptyRunsSummary);
     setAdminUsers([]);
     setAdminQuestionnaires([]);
     setAdminQuestionnairesSummary(emptyAdminQuestionnairesSummary);
@@ -961,6 +974,7 @@ function App() {
           runs={runs}
           questionnaires={publishedQuestionnaires}
           pagination={runsPagination}
+          summary={runsSummary}
           params={runsParams}
           status={runsStatus}
           error={runsError}

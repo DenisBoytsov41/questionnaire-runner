@@ -59,6 +59,16 @@ export type AdminQuestionnairesPageData = PaginatedList<AdminQuestionnaire> & {
   summary: AdminQuestionnairesSummary;
 };
 
+export type QuestionnaireRunsSummary = {
+  totalRuns: number;
+  draftRuns: number;
+  finishedRuns: number;
+};
+
+export type QuestionnaireRunsPageData = PaginatedList<QuestionnaireRun> & {
+  summary: QuestionnaireRunsSummary;
+};
+
 export type ListPageParams = {
   page?: number;
   pageSize?: number;
@@ -345,15 +355,24 @@ export async function createQuestionnaireRun(
 export async function loadQuestionnaireRunsPage(
   token: string,
   params: ListPageParams = {},
-): Promise<PaginatedList<QuestionnaireRun>> {
-  const result = await apiRequest<{ runs: QuestionnaireRun[]; pagination?: PaginationMeta }>(
+): Promise<QuestionnaireRunsPageData> {
+  const result = await apiRequest<{ runs: QuestionnaireRun[]; pagination?: PaginationMeta; summary?: QuestionnaireRunsSummary }>(
     `/api/questionnaire-runs${buildListQuery(params)}`,
     {
       token,
     },
   );
 
-  return normalizePaginatedList(result.runs, result.pagination);
+  const page = normalizePaginatedList(result.runs, result.pagination);
+
+  return {
+    ...page,
+    summary: result.summary ?? {
+      totalRuns: page.pagination.totalItems,
+      draftRuns: result.runs.filter((run) => run.status === "draft").length,
+      finishedRuns: result.runs.filter((run) => run.status === "finished").length,
+    },
+  };
 }
 
 export async function loadQuestionnaireRun(token: string, runId: string): Promise<QuestionnaireRun> {

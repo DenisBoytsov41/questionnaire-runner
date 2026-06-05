@@ -62,9 +62,10 @@ export interface PaginationMeta {
   totalPages: number;
 }
 
-export interface PaginatedResult<T> {
+export interface PaginatedResult<T, TSummary = undefined> {
   items: T[];
   pagination: PaginationMeta;
+  summary?: TSummary;
 }
 
 export async function checkDatabase(): Promise<void> {
@@ -737,7 +738,11 @@ export async function listRunsForUserPage(
   userId: string,
   role: UserRole,
   input: PaginationInput = {},
-): Promise<PaginatedResult<QuestionnaireRun>> {
+): Promise<PaginatedResult<QuestionnaireRun, {
+  totalRuns: number;
+  draftRuns: number;
+  finishedRuns: number;
+}>> {
   await ensureInitialAdmin();
   const { page: requestedPage, pageSize, search } = sanitizePagination(input);
   const params: unknown[] = [];
@@ -762,6 +767,14 @@ export async function listRunsForUserPage(
 
   const whereSql = conditions.length ? `where ${conditions.join(" and ")}` : "";
   const totalItems = await countRows(`select count(*)::int as count from questionnaire_runs ${whereSql}`, params);
+  const draftItems = await countRows(
+    `select count(*)::int as count from questionnaire_runs ${conditions.length ? `where ${conditions.join(" and ")} and status = 'draft'` : "where status = 'draft'"}`,
+    params,
+  );
+  const finishedItems = await countRows(
+    `select count(*)::int as count from questionnaire_runs ${conditions.length ? `where ${conditions.join(" and ")} and status = 'finished'` : "where status = 'finished'"}`,
+    params,
+  );
   const pagination = buildPagination(totalItems, requestedPage, pageSize);
   const pageParams = [...params, pagination.pageSize, (pagination.page - 1) * pagination.pageSize];
   const result = await pool.query<QuestionnaireRunRow>(
@@ -772,6 +785,11 @@ export async function listRunsForUserPage(
   return {
     items: result.rows.map(mapQuestionnaireRun),
     pagination,
+    summary: {
+      totalRuns: totalItems,
+      draftRuns: draftItems,
+      finishedRuns: finishedItems,
+    },
   };
 }
 

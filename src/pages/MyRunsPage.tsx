@@ -5,6 +5,7 @@ import type {
   PaginationMeta,
   PublishedQuestionnaire,
   QuestionnaireRun,
+  QuestionnaireRunsSummary,
   UserPreferences,
 } from "../shared/api/backendApi";
 import { BrandHeader, type HeaderNavigationItem, type SettingsStatus } from "../shared/ui/BrandHeader";
@@ -14,6 +15,7 @@ interface MyRunsPageProps {
   runs: QuestionnaireRun[];
   questionnaires: PublishedQuestionnaire[];
   pagination: PaginationMeta;
+  summary: QuestionnaireRunsSummary;
   params: Required<Pick<ListPageParams, "page" | "pageSize" | "search" | "status">>;
   status: "loading" | "ready" | "error";
   error: string;
@@ -35,6 +37,7 @@ export function MyRunsPage({
   runs,
   questionnaires,
   pagination,
+  summary,
   params,
   status,
   error,
@@ -88,9 +91,9 @@ export function MyRunsPage({
           </div>
 
           <div className="runs-hero-metrics">
-            <RunMetric label="Всего" value={pagination.totalItems} />
-            <RunMetric label="Черновики" value={runs.filter((run) => run.status === "draft").length} />
-            <RunMetric label="Завершено" value={runs.filter((run) => run.status === "finished").length} />
+            <RunMetric label="Всего" value={summary.totalRuns} />
+            <RunMetric label="Черновики" value={summary.draftRuns} />
+            <RunMetric label="Завершено" value={summary.finishedRuns} />
           </div>
         </div>
 

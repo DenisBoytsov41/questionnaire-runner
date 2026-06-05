@@ -3455,7 +3455,9 @@ button.operator-profile {
   flex-direction: row;
   align-items: center;
   gap: 9px;
+  max-width: 320px;
   min-height: 48px;
+  min-width: 0;
   padding: 7px 10px;
   border-radius: 999px;
   background: #f7faf9;
@@ -3463,6 +3465,7 @@ button.operator-profile {
 }
 
 .operator-logout {
+  flex: 0 0 auto;
   border: 0;
   border-left: 1px solid #dce8e6;
   background: transparent;
@@ -3480,20 +3483,27 @@ button.operator-profile {
 .operator-profile-text {
   display: grid;
   gap: 1px;
+  max-width: 170px;
   min-width: 0;
   text-align: left;
 }
 
 .operator-profile-text strong {
+  overflow: hidden;
   color: var(--ks-ink);
   font-size: 13px;
   line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .operator-profile-text small {
+  overflow: hidden;
   color: var(--ks-muted);
   font-size: 11px;
   font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .view-menu {
