@@ -120,7 +120,7 @@ export function ScenarioCatalogPage({
 
         {questionnaires.length > 0 && (
           <>
-          <div className="questionnaire-grid">
+          <div className="questionnaire-grid scenario-catalog-grid">
             {questionnaires.map((questionnaire) => (
               <article key={questionnaire.id} className="questionnaire-card scenario-card">
                 <div className="questionnaire-card-header">
@@ -156,6 +156,7 @@ export function ScenarioCatalogPage({
             totalPages={pagination.totalPages}
             onPageChange={onPageChange}
             onPageSizeChange={onPageSizeChange}
+            pageSizeOptions={[8, 12, 20, 50]}
           />
           </>
         )}

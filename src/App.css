@@ -5349,6 +5349,24 @@ html[data-text-scale="xlarge"] .top-bar .view-menu .view-settings-button {
   margin: 0;
 }
 
+.scenario-catalog-grid {
+  grid-template-columns: repeat(auto-fill, minmax(270px, 300px));
+  justify-content: start;
+  align-items: stretch;
+}
+
+.scenario-card {
+  min-height: 382px;
+}
+
+.scenario-card .questionnaire-card-header {
+  flex: 1 1 auto;
+}
+
+.scenario-card .primary-button {
+  margin-top: auto;
+}
+
 .scenario-empty-card {
   display: grid;
   gap: 14px;
@@ -6450,6 +6468,14 @@ html[data-theme="dark"] .pagination-size-button.active {
   .admin-user-create-grid,
   .admin-questionnaires-toolbar {
     grid-template-columns: 1fr;
+  }
+
+  .scenario-catalog-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .scenario-card {
+    min-height: auto;
   }
 
   .runs-hero,

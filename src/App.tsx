@@ -64,7 +64,7 @@ const emptyAdminQuestionnairesSummary: AdminQuestionnairesSummary = {
 
 const catalogInitialParams: Required<Pick<ListPageParams, "page" | "pageSize" | "search">> = {
   page: 1,
-  pageSize: 6,
+  pageSize: 8,
   search: "",
 };
 
