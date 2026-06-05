@@ -486,6 +486,19 @@ export async function listQuestionnairesForAdminPage(input: PaginationInput = {}
 
   const whereSql = conditions.length ? `where ${conditions.join(" and ")}` : "";
   const totalItems = await countRows(`select count(*)::int as count from questionnaires ${whereSql}`, params);
+  const activeItems = await countRows(
+    `select count(*)::int as count from questionnaires ${conditions.length ? `where ${conditions.join(" and ")} and archived = false` : "where archived = false"}`,
+    params,
+  );
+  const totalVersions = await countRows(
+    `
+      select count(*)::int as count
+      from questionnaire_versions
+      join questionnaires on questionnaires.id = questionnaire_versions.questionnaire_id
+      ${whereSql}
+    `,
+    params,
+  );
   const pagination = buildPagination(totalItems, requestedPage, pageSize);
   const pageParams = [...params, pagination.pageSize, (pagination.page - 1) * pagination.pageSize];
   const questionnairesResult = await pool.query<QuestionnaireRow>(
@@ -529,6 +542,11 @@ export async function listQuestionnairesForAdminPage(input: PaginationInput = {}
       };
     }),
     pagination,
+    summary: {
+      totalQuestionnaires: totalItems,
+      totalVersions,
+      activeQuestionnaires: activeItems,
+    },
   };
 }
 

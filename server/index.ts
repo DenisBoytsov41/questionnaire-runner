@@ -334,7 +334,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && parts[1] === "admin" && parts[2] === "questionnaires" && !parts[3]) {
       requireRole(context, ["admin"]);
       const page = await listQuestionnairesForAdminPage(readPaginationQuery(context.url));
-      sendJson(res, 200, { questionnaires: page.items, pagination: page.pagination });
+      sendJson(res, 200, { questionnaires: page.items, pagination: page.pagination, summary: page.summary });
       return;
     }
 

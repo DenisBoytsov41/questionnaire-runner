@@ -49,6 +49,16 @@ export type PaginatedList<T> = {
   pagination: PaginationMeta;
 };
 
+export type AdminQuestionnairesSummary = {
+  totalQuestionnaires: number;
+  totalVersions: number;
+  activeQuestionnaires: number;
+};
+
+export type AdminQuestionnairesPageData = PaginatedList<AdminQuestionnaire> & {
+  summary: AdminQuestionnairesSummary;
+};
+
 export type ListPageParams = {
   page?: number;
   pageSize?: number;
@@ -270,15 +280,25 @@ export async function loadPublishedQuestionnaire(
 export async function loadAdminQuestionnairesPage(
   token: string,
   params: ListPageParams = {},
-): Promise<PaginatedList<AdminQuestionnaire>> {
+): Promise<AdminQuestionnairesPageData> {
   const result = await apiRequest<{
     questionnaires: AdminQuestionnaire[];
     pagination?: PaginationMeta;
+    summary?: AdminQuestionnairesSummary;
   }>(`/api/admin/questionnaires${buildListQuery(params)}`, {
     token,
   });
 
-  return normalizePaginatedList(result.questionnaires, result.pagination);
+  const page = normalizePaginatedList(result.questionnaires, result.pagination);
+
+  return {
+    ...page,
+    summary: result.summary ?? {
+      totalQuestionnaires: page.pagination.totalItems,
+      totalVersions: result.questionnaires.reduce((sum, item) => sum + item.versions.length, 0),
+      activeQuestionnaires: result.questionnaires.filter((item) => !item.archived).length,
+    },
+  };
 }
 
 export async function importQuestionnairesToBackend(

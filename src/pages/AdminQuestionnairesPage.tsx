@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import type {
   AdminQuestionnaire,
+  AdminQuestionnairesSummary,
   CurrentUser,
   ImportQuestionnairesResult,
   ListPageParams,
@@ -14,6 +15,7 @@ import { Pagination } from "../shared/ui/Pagination";
 interface AdminQuestionnairesPageProps {
   questionnaires: AdminQuestionnaire[];
   pagination: PaginationMeta;
+  summary: AdminQuestionnairesSummary;
   params: Required<Pick<ListPageParams, "page" | "pageSize" | "search">>;
   status: "loading" | "ready" | "error";
   error: string;
@@ -34,6 +36,7 @@ interface AdminQuestionnairesPageProps {
 export function AdminQuestionnairesPage({
   questionnaires,
   pagination,
+  summary,
   params,
   status,
   error,
@@ -159,9 +162,9 @@ export function AdminQuestionnairesPage({
           </div>
 
           <div className="admin-users-metrics">
-            <AdminMetric label="Сценариев" value={pagination.totalItems} />
-            <AdminMetric label="Версий" value={questionnaires.reduce((sum, item) => sum + item.versions.length, 0)} />
-            <AdminMetric label="В работе" value={questionnaires.filter((item) => !item.archived).length} />
+            <AdminMetric label="Сценариев" value={summary.totalQuestionnaires} />
+            <AdminMetric label="Версий" value={summary.totalVersions} />
+            <AdminMetric label="В работе" value={summary.activeQuestionnaires} />
           </div>
         </div>
 

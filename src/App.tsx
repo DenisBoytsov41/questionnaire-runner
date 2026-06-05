@@ -14,6 +14,7 @@ import { ScenarioCatalogPage } from "./pages/ScenarioCatalogPage";
 import type {
   CurrentUser,
   AdminQuestionnaire,
+  AdminQuestionnairesSummary,
   AdminUser,
   ChangePasswordInput,
   CreateAdminUserInput,
@@ -53,6 +54,12 @@ const emptyPagination: PaginationMeta = {
   pageSize: 10,
   totalItems: 0,
   totalPages: 1,
+};
+
+const emptyAdminQuestionnairesSummary: AdminQuestionnairesSummary = {
+  totalQuestionnaires: 0,
+  totalVersions: 0,
+  activeQuestionnaires: 0,
 };
 
 const catalogInitialParams: Required<Pick<ListPageParams, "page" | "pageSize" | "search">> = {
@@ -122,6 +129,9 @@ function App() {
     ...emptyPagination,
     pageSize: adminQuestionnairesInitialParams.pageSize,
   });
+  const [adminQuestionnairesSummary, setAdminQuestionnairesSummary] = useState<AdminQuestionnairesSummary>(
+    emptyAdminQuestionnairesSummary,
+  );
   const [adminQuestionnairesStatus, setAdminQuestionnairesStatus] = useState<"loading" | "ready" | "error">("loading");
   const [adminQuestionnairesError, setAdminQuestionnairesError] = useState("");
   const [questionnaires, setQuestionnaires] = useState<Questionnaire[]>([]);
@@ -298,9 +308,11 @@ function App() {
       const page = await loadAdminQuestionnairesPage(authToken, adminQuestionnairesParams);
       setAdminQuestionnaires(page.items);
       setAdminQuestionnairesPagination(page.pagination);
+      setAdminQuestionnairesSummary(page.summary);
       setAdminQuestionnairesStatus("ready");
     } catch (error) {
       setAdminQuestionnaires([]);
+      setAdminQuestionnairesSummary(emptyAdminQuestionnairesSummary);
       setAdminQuestionnairesStatus("error");
       setAdminQuestionnairesError(
         error instanceof Error ? error.message : "Не удалось получить список сценариев из базы.",
@@ -394,10 +406,12 @@ function App() {
       .then((page) => {
         setAdminQuestionnaires(page.items);
         setAdminQuestionnairesPagination(page.pagination);
+        setAdminQuestionnairesSummary(page.summary);
         setAdminQuestionnairesStatus("ready");
       })
       .catch((error) => {
         setAdminQuestionnaires([]);
+        setAdminQuestionnairesSummary(emptyAdminQuestionnairesSummary);
         setAdminQuestionnairesStatus("error");
         setAdminQuestionnairesError(
           error instanceof Error ? error.message : "РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє СЃС†РµРЅР°СЂРёРµРІ РёР· Р±Р°Р·С‹.",
@@ -668,6 +682,7 @@ function App() {
     setRuns([]);
     setAdminUsers([]);
     setAdminQuestionnaires([]);
+    setAdminQuestionnairesSummary(emptyAdminQuestionnairesSummary);
     setQuestionnaires([]);
     setSelectedQuestionnaire(null);
     setActiveRunId("");
@@ -916,6 +931,7 @@ function App() {
         <AdminQuestionnairesPage
           questionnaires={adminQuestionnaires}
           pagination={adminQuestionnairesPagination}
+          summary={adminQuestionnairesSummary}
           params={adminQuestionnairesParams}
           status={adminQuestionnairesStatus}
           error={adminQuestionnairesError}
