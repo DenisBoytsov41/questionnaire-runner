@@ -54,7 +54,7 @@ export function MyRunsPage({
   onOpenProfile,
   onLogout,
 }: MyRunsPageProps) {
-  const [openedRunId, setOpenedRunId] = useState<string | null>(null);
+  const [openedRunIds, setOpenedRunIds] = useState<Set<string>>(() => new Set());
   const [deletingRunId, setDeletingRunId] = useState("");
   const [localError, setLocalError] = useState("");
   const [copyStatus, setCopyStatus] = useState<{ runId: string; message: string; type: "success" | "error" } | null>(
@@ -65,6 +65,20 @@ export function MyRunsPage({
     [questionnaires],
   );
   const isLoading = status === "loading";
+
+  function toggleRunDetails(runId: string) {
+    setOpenedRunIds((current) => {
+      const next = new Set(current);
+
+      if (next.has(runId)) {
+        next.delete(runId);
+      } else {
+        next.add(runId);
+      }
+
+      return next;
+    });
+  }
 
   return (
     <main className="app-shell">
@@ -166,17 +180,18 @@ export function MyRunsPage({
           <>
             <div className="runs-list">
               {runs.map((run) => {
-              const title = questionnaireTitleById.get(run.questionnaireId) ?? run.questionnaireId;
-              const isOpened = openedRunId === run.id;
+                const title = questionnaireTitleById.get(run.questionnaireId) ?? run.questionnaireId;
+                const isOpened = openedRunIds.has(run.id);
 
-              return (
-                <article key={run.id} className={`run-card ${run.status}`}>
+                return (
+                  <article key={run.id} className={`run-card ${run.status}`}>
                   <div className="run-card-main">
                     <div>
                       <span className={`run-status ${run.status}`}>
                         {run.status === "finished" ? "Завершено" : "Черновик"}
                       </span>
                       <h2>{title}</h2>
+                      <p className="run-scenario-code">Код сценария: {run.questionnaireId}</p>
                       <p>
                         Ответов: {Object.keys(run.answers).length}. Маршрут: {run.route.length} шагов.
                       </p>
@@ -236,7 +251,7 @@ export function MyRunsPage({
                     <button
                       type="button"
                       className="secondary-button"
-                      onClick={() => setOpenedRunId(isOpened ? null : run.id)}
+                      onClick={() => toggleRunDetails(run.id)}
                     >
                       {isOpened ? "Скрыть детали" : "Открыть детали"}
                     </button>
@@ -272,10 +287,6 @@ export function MyRunsPage({
                             <dd>{run.id}</dd>
                           </div>
                           <div>
-                            <dt>Код сценария</dt>
-                            <dd>{run.questionnaireId}</dd>
-                          </div>
-                          <div>
                             <dt>Текущий вопрос</dt>
                             <dd>{run.currentQuestionId ?? "опрос завершён"}</dd>
                           </div>
@@ -288,8 +299,8 @@ export function MyRunsPage({
                       </div>
                     </div>
                   )}
-                </article>
-              );
+                  </article>
+                );
               })}
             </div>
             <Pagination

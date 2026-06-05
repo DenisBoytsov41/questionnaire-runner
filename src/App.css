@@ -3442,6 +3442,12 @@ html[data-vision="high-contrast"] .top-bar .view-menu .view-settings {
   white-space: nowrap;
 }
 
+.top-file-button:hover,
+.top-file-button:focus-visible {
+  border-color: var(--ks-brand);
+  box-shadow: 0 0 0 4px rgba(0, 135, 127, 0.12);
+}
+
 .operator-profile {
   min-width: 0;
   border: 1px solid #dce8e6;
@@ -5229,6 +5235,12 @@ html[data-text-scale="xlarge"] .operator-profile-text small {
   inline-size: 100%;
 }
 
+.top-bar .view-menu .view-reset-button:hover,
+.top-bar .view-menu .view-reset-button:focus-visible {
+  border-color: var(--ks-brand);
+  box-shadow: 0 0 0 4px rgba(0, 135, 127, 0.12);
+}
+
 html[data-theme="dark"] .top-bar .view-menu .view-settings {
   border-color: #2d6b64;
   background: #0f322e;
@@ -6250,6 +6262,12 @@ html[data-text-scale="xlarge"] .top-bar .view-menu .view-settings-button {
 .run-card p {
   margin: 0;
   color: var(--ks-muted);
+}
+
+.run-scenario-code {
+  font-size: 13px;
+  font-weight: 850;
+  overflow-wrap: anywhere;
 }
 
 .run-card-dates {
