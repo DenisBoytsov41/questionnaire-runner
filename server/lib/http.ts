@@ -3,6 +3,8 @@ import type { PublicUser, UserRole } from "../types.js";
 import { getUserById } from "./storage.js";
 import { toPublicUser, verifyToken } from "./crypto.js";
 
+const maxJsonBodyBytes = 20 * 1024 * 1024;
+
 export interface RequestContext {
   req: IncomingMessage;
   res: ServerResponse;
@@ -42,9 +44,18 @@ export async function createContext(
 
 export async function readJsonBody<T>(req: IncomingMessage): Promise<T> {
   const chunks: Buffer[] = [];
+  let bodyBytes = 0;
 
   for await (const chunk of req) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+
+    bodyBytes += buffer.byteLength;
+
+    if (bodyBytes > maxJsonBodyBytes) {
+      throw new HttpError(413, "Тело запроса слишком большое. Максимальный размер JSON-запроса - 20 МБ.");
+    }
+
+    chunks.push(buffer);
   }
 
   const rawBody = stripJsonBom(Buffer.concat(chunks).toString("utf8"));
