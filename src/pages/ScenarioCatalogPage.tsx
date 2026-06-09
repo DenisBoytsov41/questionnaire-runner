@@ -156,7 +156,6 @@ export function ScenarioCatalogPage({
             totalPages={pagination.totalPages}
             onPageChange={onPageChange}
             onPageSizeChange={onPageSizeChange}
-            pageSizeOptions={[8, 12, 20, 50]}
           />
           </>
         )}

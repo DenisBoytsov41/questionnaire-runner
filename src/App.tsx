@@ -75,7 +75,7 @@ const emptyRunsSummary: QuestionnaireRunsSummary = {
 
 const catalogInitialParams: Required<Pick<ListPageParams, "page" | "pageSize" | "search">> = {
   page: 1,
-  pageSize: 8,
+  pageSize: 5,
   search: "",
 };
 

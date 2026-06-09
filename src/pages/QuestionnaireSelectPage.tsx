@@ -28,7 +28,7 @@ export function QuestionnaireSelectPage({
   onLogout,
 }: QuestionnaireSelectPageProps) {
   const questionnairesPagination = usePagination(questionnaires, {
-    defaultPageSize: 6,
+    defaultPageSize: 5,
     resetKey: String(questionnaires.length),
   });
 
