@@ -1506,11 +1506,17 @@ body {
   margin: -4px 0 0;
   border: 1px solid #dce8e6;
   border-radius: 12px;
+  min-height: 42px;
   padding: 10px 12px;
   background: rgba(255, 255, 255, 0.72);
   color: var(--ks-muted);
   font-size: 13px;
   font-weight: 750;
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease,
+    color 180ms ease;
 }
 
 .server-save-status.saving {
@@ -1523,10 +1529,52 @@ body {
   color: var(--ks-brand-dark);
 }
 
+.server-save-status.is-saving {
+  box-shadow: 0 0 0 3px rgba(0, 135, 127, 0.08);
+  animation: server-save-pulse 1.2s ease-in-out infinite;
+}
+
+.server-save-time {
+  display: inline-block;
+  min-width: 3.2em;
+  font: inherit;
+  animation: server-save-time-update 260ms ease-out;
+}
+
 .server-save-status.error {
   border-color: rgba(190, 18, 60, 0.28);
   background: rgba(255, 241, 242, 0.9);
   color: #be123c;
+}
+
+@keyframes server-save-pulse {
+  0%,
+  100% {
+    border-color: rgba(0, 135, 127, 0.32);
+  }
+
+  50% {
+    border-color: rgba(0, 135, 127, 0.72);
+  }
+}
+
+@keyframes server-save-time-update {
+  from {
+    opacity: 0.35;
+    transform: translateY(2px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .server-save-status.is-saving,
+  .server-save-time {
+    animation: none;
+  }
 }
 
 .scenario-check-card {

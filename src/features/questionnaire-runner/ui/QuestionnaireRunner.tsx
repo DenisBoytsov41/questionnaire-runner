@@ -49,9 +49,14 @@ export function QuestionnaireRunner({ questionnaire, backendRun }: Questionnaire
     backendRun?.initialRun?.updatedAt ?? getRunnerDraftSavedAt(questionnaire),
   );
   const [lastSavedAt, setLastSavedAt] = useState(restoredDraftSavedAt);
-  const [serverSavedAt, setServerSavedAt] = useState("");
-  const [serverSaveStatus, setServerSaveStatus] = useState<ServerSaveStatus>("idle");
+  const [serverSavedAt, setServerSavedAt] = useState(backendRun?.initialRun?.updatedAt ?? "");
+  const [serverSaveStatus, setServerSaveStatus] = useState<ServerSaveStatus>(
+    backendRun?.initialRun?.updatedAt ? "saved" : "idle",
+  );
+  const [serverSaveInProgress, setServerSaveInProgress] = useState(false);
   const finishedRunIdsRef = useRef(new Set<string>());
+  const latestSaveRequestRef = useRef(0);
+  const serverSavedAtRef = useRef(backendRun?.initialRun?.updatedAt ?? "");
   const backendRunId = backendRun?.runId;
   const backendToken = backendRun?.token;
   const [state, dispatch] = useReducer(
@@ -107,10 +112,14 @@ export function QuestionnaireRunner({ questionnaire, backendRun }: Questionnaire
       return;
     }
 
+    const requestId = latestSaveRequestRef.current + 1;
+
+    latestSaveRequestRef.current = requestId;
     const timeoutId = window.setTimeout(() => {
       const payload = buildRunPayload(state);
 
-      setServerSaveStatus("saving");
+      setServerSaveInProgress(true);
+      setServerSaveStatus((current) => (serverSavedAtRef.current ? current : "saving"));
 
       const request = state.isFinished
         ? finishQuestionnaireRun(backendToken, backendRunId, payload)
@@ -118,15 +127,26 @@ export function QuestionnaireRunner({ questionnaire, backendRun }: Questionnaire
 
       request
         .then((run) => {
+          if (requestId !== latestSaveRequestRef.current) {
+            return;
+          }
+
           if (state.isFinished) {
             finishedRunIdsRef.current.add(backendRunId);
           }
 
+          serverSavedAtRef.current = run.updatedAt;
           setServerSavedAt(run.updatedAt);
           setServerSaveStatus("saved");
+          setServerSaveInProgress(false);
         })
         .catch(() => {
+          if (requestId !== latestSaveRequestRef.current) {
+            return;
+          }
+
           setServerSaveStatus("error");
+          setServerSaveInProgress(false);
         });
     }, state.isFinished ? 0 : 700);
 
@@ -207,6 +227,7 @@ export function QuestionnaireRunner({ questionnaire, backendRun }: Questionnaire
           draftSavedAt={lastSavedAt}
           serverSaveStatus={backendRun ? serverSaveStatus : undefined}
           serverSavedAt={serverSavedAt}
+          serverSaveInProgress={serverSaveInProgress}
           onBack={() => dispatch({ type: "BACK" })}
           onClearDraft={handleRestart}
           onNavigateToQuestion={(questionId) => {

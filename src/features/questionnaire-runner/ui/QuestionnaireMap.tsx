@@ -18,6 +18,7 @@ interface QuestionnaireMapProps {
   draftSavedAt: string;
   serverSaveStatus?: "idle" | "saving" | "saved" | "error";
   serverSavedAt?: string;
+  serverSaveInProgress?: boolean;
   onBack: () => void;
   onClearDraft: () => void;
   onNavigateToQuestion: (questionId: string) => void;
@@ -33,6 +34,7 @@ export function QuestionnaireMap({
   draftSavedAt,
   serverSaveStatus,
   serverSavedAt,
+  serverSaveInProgress,
   onBack,
   onClearDraft,
   onNavigateToQuestion,
@@ -119,8 +121,20 @@ export function QuestionnaireMap({
         </button>
 
         {serverSaveStatus && (
-          <p className={`server-save-status ${serverSaveStatus}`}>
-            {formatServerSaveStatus(serverSaveStatus, serverSavedAt)}
+          <p
+            className={`server-save-status ${serverSaveStatus}${serverSaveInProgress ? " is-saving" : ""}`}
+            aria-live="polite"
+          >
+            {serverSavedAt && serverSaveStatus !== "error" ? (
+              <>
+                <span>Сохранено в базе:</span>{" "}
+                <time key={serverSavedAt} className="server-save-time" dateTime={serverSavedAt}>
+                  {formatTime(serverSavedAt)}
+                </time>
+              </>
+            ) : (
+              formatServerSaveStatus(serverSaveStatus)
+            )}
           </p>
         )}
       </section>
@@ -237,14 +251,13 @@ export function QuestionnaireMap({
 
 function formatServerSaveStatus(
   status: NonNullable<QuestionnaireMapProps["serverSaveStatus"]>,
-  savedAt: string | undefined,
 ): string {
   if (status === "saving") {
     return "Сохраняем в базе...";
   }
 
   if (status === "saved") {
-    return savedAt ? `Сохранено в базе: ${formatTime(savedAt)}` : "Сохранено в базе.";
+    return "Сохранено в базе.";
   }
 
   if (status === "error") {
