@@ -6,6 +6,7 @@ import type {
   UpdateProfileInput,
   UserPreferences,
 } from "../shared/api/backendApi";
+import { compressProfileImage } from "../shared/lib/profileImage";
 
 interface ProfilePanelProps {
   user: CurrentUser;
@@ -94,24 +95,15 @@ export function ProfilePanel({ user, onClose, onSave, onChangePassword }: Profil
       return;
     }
 
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      const result = typeof reader.result === "string" ? reader.result : "";
-
-      if (!result.startsWith("data:image/")) {
-        setError("Не удалось подготовить изображение профиля.");
-        return;
-      }
-
-      setAvatarImage(result);
-    };
-
-    reader.onerror = () => {
-      setError("Не удалось прочитать файл изображения.");
-    };
-
-    reader.readAsDataURL(file);
+    void compressProfileImage(file)
+      .then(setAvatarImage)
+      .catch((imageError) => {
+        setError(
+          imageError instanceof Error
+            ? imageError.message
+            : "Не удалось подготовить изображение профиля.",
+        );
+      });
   }
 
   function clearProfileImage() {

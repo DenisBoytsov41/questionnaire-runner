@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { singleQuestionnaireSchema } from "./entities/questionnaire/schema";
 import type { Questionnaire } from "./entities/questionnaire/types";
 import { validateQuestionnaireContract } from "./entities/questionnaire/validation";
@@ -48,9 +48,11 @@ import {
   updateUserAccess,
 } from "./shared/api/backendApi";
 import { BrandHeader, type SettingsStatus } from "./shared/ui/BrandHeader";
+import { compressProfileImage } from "./shared/lib/profileImage";
 import "./App.css";
 
 const authTokenStorageKey = "ks-questionnaire-auth-token";
+const oversizedAvatarDataLength = 300_000;
 
 const emptyPagination: PaginationMeta = {
   page: 1,
@@ -156,6 +158,8 @@ function App() {
   const [loadError, setLoadError] = useState("");
   const [settingsStatus, setSettingsStatus] = useState<SettingsStatus>("idle");
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const preferencesSaveVersionRef = useRef(0);
+  const preferencesSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   const activePreferences = currentUser?.preferences ?? defaultUserPreferences;
   const currentUserId = currentUser?.id;
@@ -170,7 +174,7 @@ function App() {
   }, [activePreferences]);
 
   useEffect(() => {
-    if (!authToken) {
+    if (!authToken || currentUser) {
       return;
     }
 
@@ -204,7 +208,46 @@ function App() {
     return () => {
       isCancelled = true;
     };
-  }, [authToken]);
+  }, [authToken, currentUser]);
+
+  useEffect(() => {
+    const avatarImage = currentUser?.preferences.avatarImage ?? "";
+
+    if (!authToken || !currentUser || avatarImage.length <= oversizedAvatarDataLength) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    compressProfileImage(avatarImage)
+      .then((compressedAvatar) => {
+        if (isCancelled || compressedAvatar.length >= avatarImage.length) {
+          return null;
+        }
+
+        return updateCurrentUserProfile(authToken, {
+          preferences: {
+            ...currentUser.preferences,
+            avatarImage: compressedAvatar,
+          },
+        });
+      })
+      .then((updatedUser) => {
+        if (!updatedUser || isCancelled) {
+          return;
+        }
+
+        setCurrentUser(updatedUser);
+        setAdminUsers((items) => replaceUserInList(items, updatedUser));
+      })
+      .catch(() => {
+        // The original avatar remains available if browser-side optimization fails.
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [authToken, currentUser]);
 
   useEffect(() => {
     if (!authToken || !currentUserId || currentUserRole === "user") {
@@ -740,23 +783,37 @@ function App() {
     }
 
     const previousUser = currentUser;
-
     const optimisticUser = { ...currentUser, preferences };
+    const saveVersion = preferencesSaveVersionRef.current + 1;
 
+    preferencesSaveVersionRef.current = saveVersion;
     setCurrentUser(optimisticUser);
     setAdminUsers((items) => replaceUserInList(items, optimisticUser));
     setSettingsStatus("saving");
 
-    try {
-      const updatedUser = await updateCurrentUserProfile(authToken, { preferences });
-      setCurrentUser(updatedUser);
-      setAdminUsers((items) => replaceUserInList(items, updatedUser));
-      setSettingsStatus("saved");
-    } catch {
-      setCurrentUser(previousUser);
-      setAdminUsers((items) => replaceUserInList(items, previousUser));
-      setSettingsStatus("error");
-    }
+    preferencesSaveQueueRef.current = preferencesSaveQueueRef.current
+      .catch(() => undefined)
+      .then(async () => {
+        try {
+          const updatedUser = await updateCurrentUserProfile(authToken, { preferences });
+
+          if (preferencesSaveVersionRef.current !== saveVersion) {
+            return;
+          }
+
+          setCurrentUser(updatedUser);
+          setAdminUsers((items) => replaceUserInList(items, updatedUser));
+          setSettingsStatus("saved");
+        } catch {
+          if (preferencesSaveVersionRef.current !== saveVersion) {
+            return;
+          }
+
+          setCurrentUser(previousUser);
+          setAdminUsers((items) => replaceUserInList(items, previousUser));
+          setSettingsStatus("error");
+        }
+      });
   }
 
   async function handleProfileSave(input: UpdateProfileInput) {

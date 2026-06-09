@@ -967,6 +967,12 @@ async function updateRun(input: {
       throw new StorageForbiddenError("Нет доступа к этому прохождению.");
     }
 
+    if (currentRun.status === "finished" && status === "draft") {
+      throw new StorageConflictError(
+        "Завершённое прохождение нельзя снова перевести в черновик.",
+      );
+    }
+
     const result = await client.query<QuestionnaireRunRow>(
       `
         update questionnaire_runs
