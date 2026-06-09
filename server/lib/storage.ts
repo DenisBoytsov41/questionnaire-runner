@@ -438,6 +438,109 @@ export async function publishQuestionnaireVersion(input: {
   });
 }
 
+export async function deleteQuestionnaireVersion(input: {
+  questionnaireId: string;
+  versionId: string;
+  adminId: string;
+}): Promise<boolean> {
+  return inTransaction(async (client) => {
+    const versionResult = await client.query<QuestionnaireVersionRow>(
+      versionSelectSql("where id = $1 and questionnaire_id = $2"),
+      [input.versionId, input.questionnaireId],
+    );
+    const version = versionResult.rows[0] ? mapQuestionnaireVersion(versionResult.rows[0]) : null;
+
+    if (!version) {
+      return false;
+    }
+
+    const runCount = await client.query<{ count: number }>(
+      "select count(*)::int as count from questionnaire_runs where questionnaire_version_id = $1",
+      [input.versionId],
+    );
+
+    if ((runCount.rows[0]?.count ?? 0) > 0) {
+      throw new StorageConflictError(
+        `Версию ${version.version} нельзя удалить: по ней уже есть черновики или завершённые прохождения.`,
+      );
+    }
+
+    const versionCount = await client.query<{ count: number }>(
+      "select count(*)::int as count from questionnaire_versions where questionnaire_id = $1",
+      [input.questionnaireId],
+    );
+
+    if ((versionCount.rows[0]?.count ?? 0) <= 1) {
+      throw new StorageConflictError(
+        "Это единственная версия сценария. Для полного удаления используйте кнопку «Удалить сценарий».",
+      );
+    }
+
+    await client.query(
+      `
+        update questionnaires
+        set active_version_id = null,
+            archived = true,
+            updated_at = now()
+        where id = $1 and active_version_id = $2
+      `,
+      [input.questionnaireId, input.versionId],
+    );
+    await client.query("delete from questionnaire_versions where id = $1", [input.versionId]);
+    await addAuditLog(client, input.adminId, "questionnaire.version_deleted", "questionnaire", input.questionnaireId, {
+      versionId: input.versionId,
+      version: version.version,
+    });
+
+    return true;
+  });
+}
+
+export async function deleteQuestionnaire(input: {
+  questionnaireId: string;
+  adminId: string;
+}): Promise<boolean> {
+  return inTransaction(async (client) => {
+    const questionnaireResult = await client.query<QuestionnaireRow>(
+      questionnaireSelectSql("where id = $1"),
+      [input.questionnaireId],
+    );
+    const questionnaire = questionnaireResult.rows[0]
+      ? mapQuestionnaire(questionnaireResult.rows[0])
+      : null;
+
+    if (!questionnaire) {
+      return false;
+    }
+
+    const runCount = await client.query<{ count: number }>(
+      "select count(*)::int as count from questionnaire_runs where questionnaire_id = $1",
+      [input.questionnaireId],
+    );
+
+    if ((runCount.rows[0]?.count ?? 0) > 0) {
+      throw new StorageConflictError(
+        "Сценарий нельзя удалить: по нему уже есть черновики или завершённые прохождения.",
+      );
+    }
+
+    await client.query(
+      "update questionnaires set active_version_id = null where id = $1",
+      [input.questionnaireId],
+    );
+    await client.query(
+      "delete from questionnaire_versions where questionnaire_id = $1",
+      [input.questionnaireId],
+    );
+    await client.query("delete from questionnaires where id = $1", [input.questionnaireId]);
+    await addAuditLog(client, input.adminId, "questionnaire.deleted", "questionnaire", input.questionnaireId, {
+      title: questionnaire.title,
+    });
+
+    return true;
+  });
+}
+
 export async function listQuestionnairesForAdmin() {
   await ensureInitialAdmin();
 

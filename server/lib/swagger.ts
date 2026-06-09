@@ -510,6 +510,35 @@ const openApiDocument = {
         },
       },
     },
+    "/api/admin/questionnaires/{id}": {
+      delete: {
+        tags: ["Опросники"],
+        security: [{ bearerAuth: [] }],
+        summary: "Удалить сценарий вместе с версиями, если по нему нет прохождений",
+        parameters: [pathParameter("id", "Идентификатор сценария")],
+        responses: {
+          200: response("Сценарий удалён", { deleted: { type: "boolean" } }),
+          404: errorResponse("Сценарий не найден"),
+          409: errorResponse("По сценарию уже есть прохождения"),
+        },
+      },
+    },
+    "/api/admin/questionnaires/{id}/versions/{versionId}": {
+      delete: {
+        tags: ["Опросники"],
+        security: [{ bearerAuth: [] }],
+        summary: "Удалить версию сценария, если она не используется в прохождениях",
+        parameters: [
+          pathParameter("id", "Идентификатор сценария"),
+          pathParameter("versionId", "Идентификатор версии"),
+        ],
+        responses: {
+          200: response("Версия удалена", { deleted: { type: "boolean" } }),
+          404: errorResponse("Сценарий или версия не найдены"),
+          409: errorResponse("Версия используется или является единственной"),
+        },
+      },
+    },
     "/api/questionnaire-runs": {
       get: {
         tags: ["Прохождения"],

@@ -339,6 +339,30 @@ export async function publishAdminQuestionnaireVersion(
   );
 }
 
+export async function deleteAdminQuestionnaireVersion(
+  token: string,
+  questionnaireId: string,
+  versionId: string,
+): Promise<void> {
+  await apiRequest(
+    `/api/admin/questionnaires/${encodeURIComponent(questionnaireId)}/versions/${encodeURIComponent(versionId)}`,
+    {
+      method: "DELETE",
+      token,
+    },
+  );
+}
+
+export async function deleteAdminQuestionnaire(
+  token: string,
+  questionnaireId: string,
+): Promise<void> {
+  await apiRequest(`/api/admin/questionnaires/${encodeURIComponent(questionnaireId)}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
 export async function createQuestionnaireRun(
   token: string,
   questionnaireId: string,

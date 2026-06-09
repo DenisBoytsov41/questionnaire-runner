@@ -32,6 +32,8 @@ import {
   changeCurrentUserPassword,
   createAdminUser,
   createQuestionnaireRun,
+  deleteAdminQuestionnaire,
+  deleteAdminQuestionnaireVersion,
   deleteQuestionnaireRunDraft,
   defaultUserPreferences,
   importQuestionnairesToBackend,
@@ -518,6 +520,27 @@ function App() {
     await refreshPublishedQuestionnaires();
   }
 
+  async function handleDeleteAdminQuestionnaire(questionnaireId: string): Promise<void> {
+    if (!authToken) {
+      throw new Error("Сессия завершена. Войдите заново.");
+    }
+
+    await deleteAdminQuestionnaire(authToken, questionnaireId);
+    await refreshPublishedQuestionnaires();
+  }
+
+  async function handleDeleteAdminQuestionnaireVersion(
+    questionnaireId: string,
+    versionId: string,
+  ): Promise<void> {
+    if (!authToken) {
+      throw new Error("Сессия завершена. Войдите заново.");
+    }
+
+    await deleteAdminQuestionnaireVersion(authToken, questionnaireId, versionId);
+    await refreshPublishedQuestionnaires();
+  }
+
   async function handleOpenPublishedQuestionnaireById(questionnaireId: string): Promise<void> {
     const questionnaire = publishedQuestionnaires.find((item) => item.id === questionnaireId);
 
@@ -952,6 +975,8 @@ function App() {
           onParamsChange={handleAdminQuestionnairesParamsChange}
           onImportJson={handleImportAdminQuestionnaires}
           onPublishVersion={handlePublishAdminQuestionnaireVersion}
+          onDeleteQuestionnaire={handleDeleteAdminQuestionnaire}
+          onDeleteVersion={handleDeleteAdminQuestionnaireVersion}
           onOpenAsOperator={handleOpenPublishedQuestionnaireById}
           {...sharedHeaderProps}
         />

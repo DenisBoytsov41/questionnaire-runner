@@ -5631,6 +5631,16 @@ html[data-text-scale="xlarge"] .top-bar .view-menu .view-settings-button {
   min-width: 190px;
 }
 
+.admin-questionnaire-card-actions {
+  display: grid;
+  justify-items: end;
+  gap: 12px;
+}
+
+.admin-questionnaire-card-actions .danger-soft-button {
+  width: auto;
+}
+
 .admin-questionnaire-current-state {
   display: flex;
   align-items: center;
@@ -5701,6 +5711,17 @@ html[data-text-scale="xlarge"] .top-bar .view-menu .view-settings-button {
 .admin-questionnaire-version .secondary-button {
   width: auto;
   min-width: 150px;
+}
+
+.admin-questionnaire-version-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.admin-questionnaire-version-actions .danger-soft-button {
+  min-width: 110px;
 }
 
 .runs-hero,
@@ -6636,6 +6657,16 @@ html[data-theme="dark"][data-vision="high-contrast"] .run-status.finished {
   .admin-questionnaire-card-meta {
     justify-items: start;
     min-width: 0;
+  }
+
+  .admin-questionnaire-card-actions {
+    justify-items: stretch;
+  }
+
+  .admin-questionnaire-card-actions .danger-soft-button,
+  .admin-questionnaire-version-actions,
+  .admin-questionnaire-version-actions .secondary-button {
+    width: 100%;
   }
 
   .admin-questionnaire-version-badges {

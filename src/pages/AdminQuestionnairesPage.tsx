@@ -23,6 +23,8 @@ interface AdminQuestionnairesPageProps {
   onParamsChange: (params: Partial<Required<Pick<ListPageParams, "page" | "pageSize" | "search">>>) => void;
   onImportJson: (input: unknown) => Promise<ImportQuestionnairesResult[]>;
   onPublishVersion: (questionnaireId: string, versionId: string) => Promise<void>;
+  onDeleteQuestionnaire: (questionnaireId: string) => Promise<void>;
+  onDeleteVersion: (questionnaireId: string, versionId: string) => Promise<void>;
   onOpenAsOperator: (questionnaireId: string) => Promise<void>;
   navigationItems?: HeaderNavigationItem[];
   user: CurrentUser;
@@ -44,6 +46,8 @@ export function AdminQuestionnairesPage({
   onParamsChange,
   onImportJson,
   onPublishVersion,
+  onDeleteQuestionnaire,
+  onDeleteVersion,
   onOpenAsOperator,
   navigationItems,
   user,
@@ -60,6 +64,8 @@ export function AdminQuestionnairesPage({
   const [imported, setImported] = useState<ImportQuestionnairesResult[]>([]);
   const [importStatus, setImportStatus] = useState<"idle" | "loading">("idle");
   const [publishingVersionId, setPublishingVersionId] = useState("");
+  const [deletingQuestionnaireId, setDeletingQuestionnaireId] = useState("");
+  const [deletingVersionId, setDeletingVersionId] = useState("");
   const [openingQuestionnaireId, setOpeningQuestionnaireId] = useState("");
   const isLoading = status === "loading";
 
@@ -134,6 +140,62 @@ export function AdminQuestionnairesPage({
       setLocalError(openError instanceof Error ? openError.message : "Не удалось открыть сценарий как оператор.");
     } finally {
       setOpeningQuestionnaireId("");
+    }
+  }
+
+  async function deleteQuestionnaire(questionnaire: AdminQuestionnaire) {
+    const confirmed = window.confirm(
+      `Удалить сценарий «${questionnaire.title}» и все его версии?\n\nСценарий нельзя будет восстановить.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingQuestionnaireId(questionnaire.id);
+    setLocalError("");
+
+    try {
+      await onDeleteQuestionnaire(questionnaire.id);
+      onRefresh();
+    } catch (deleteError) {
+      setLocalError(
+        deleteError instanceof Error ? deleteError.message : "Не удалось удалить сценарий.",
+      );
+    } finally {
+      setDeletingQuestionnaireId("");
+    }
+  }
+
+  async function deleteVersion(
+    questionnaire: AdminQuestionnaire,
+    versionId: string,
+    versionNumber: number,
+    isCurrent: boolean,
+  ) {
+    const currentWarning = isCurrent
+      ? "\n\nЭто текущая версия. После удаления сценарий исчезнет из рабочего места операторов."
+      : "";
+    const confirmed = window.confirm(
+      `Удалить версию ${versionNumber} сценария «${questionnaire.title}»?${currentWarning}`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingVersionId(versionId);
+    setLocalError("");
+
+    try {
+      await onDeleteVersion(questionnaire.id, versionId);
+      onRefresh();
+    } catch (deleteError) {
+      setLocalError(
+        deleteError instanceof Error ? deleteError.message : "Не удалось удалить версию сценария.",
+      );
+    } finally {
+      setDeletingVersionId("");
     }
   }
 
@@ -294,9 +356,19 @@ export function AdminQuestionnairesPage({
                     <h2>{questionnaire.title}</h2>
                     <p>Код сценария: {questionnaire.id}</p>
                   </div>
-                  <div className="admin-questionnaire-card-meta">
-                    <span>Версий: {questionnaire.versions.length}</span>
-                    <span>Обновлён: {formatDateTime(questionnaire.updatedAt)}</span>
+                  <div className="admin-questionnaire-card-actions">
+                    <div className="admin-questionnaire-card-meta">
+                      <span>Версий: {questionnaire.versions.length}</span>
+                      <span>Обновлён: {formatDateTime(questionnaire.updatedAt)}</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="secondary-button danger-soft-button"
+                      disabled={deletingQuestionnaireId === questionnaire.id}
+                      onClick={() => void deleteQuestionnaire(questionnaire)}
+                    >
+                      {deletingQuestionnaireId === questionnaire.id ? "Удаляем..." : "Удалить сценарий"}
+                    </button>
                   </div>
                 </div>
 
@@ -323,6 +395,7 @@ export function AdminQuestionnairesPage({
                   {visibleVersions.map((version) => {
                     const isCurrent = version.id === questionnaire.activeVersionId;
                     const isPublishing = publishingVersionId === version.id;
+                    const isDeleting = deletingVersionId === version.id;
 
                     return (
                       <div key={version.id} className={`admin-questionnaire-version ${isCurrent ? "current" : ""}`}>
@@ -334,14 +407,26 @@ export function AdminQuestionnairesPage({
                           {isCurrent && <span className="status-badge status-active">Сейчас у операторов</span>}
                           {version.published && <span className="status-badge">Опубликована</span>}
                         </div>
-                        <button
-                          type="button"
-                          className="secondary-button"
-                          disabled={isCurrent || isPublishing}
-                          onClick={() => void publishVersion(questionnaire.id, version.id)}
-                        >
-                          {isPublishing ? "Публикуем..." : isCurrent ? "Уже выбрана" : "Опубликовать"}
-                        </button>
+                        <div className="admin-questionnaire-version-actions">
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            disabled={isCurrent || isPublishing || isDeleting}
+                            onClick={() => void publishVersion(questionnaire.id, version.id)}
+                          >
+                            {isPublishing ? "Публикуем..." : isCurrent ? "Уже выбрана" : "Опубликовать"}
+                          </button>
+                          <button
+                            type="button"
+                            className="secondary-button danger-soft-button"
+                            disabled={isDeleting || isPublishing}
+                            onClick={() =>
+                              void deleteVersion(questionnaire, version.id, version.version, isCurrent)
+                            }
+                          >
+                            {isDeleting ? "Удаляем..." : "Удалить"}
+                          </button>
+                        </div>
                       </div>
                     );
                   })}

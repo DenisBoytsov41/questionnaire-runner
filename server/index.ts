@@ -27,6 +27,8 @@ import {
   closeDatabase,
   createRun,
   createUser,
+  deleteQuestionnaire,
+  deleteQuestionnaireVersion,
   deleteDraftRun,
   findUserByLogin,
   finishRun,
@@ -358,6 +360,50 @@ const server = createServer(async (req, res) => {
       }
 
       sendJson(res, 200, result);
+      return;
+    }
+
+    if (
+      req.method === "DELETE"
+      && parts[1] === "admin"
+      && parts[2] === "questionnaires"
+      && parts[3]
+      && parts[4] === "versions"
+      && parts[5]
+    ) {
+      const admin = requireRole(context, ["admin"]);
+      const deleted = await deleteQuestionnaireVersion({
+        questionnaireId: parts[3],
+        versionId: parts[5],
+        adminId: admin.id,
+      });
+
+      if (!deleted) {
+        throw new HttpError(404, "Сценарий или версия не найдены.");
+      }
+
+      sendJson(res, 200, { deleted: true });
+      return;
+    }
+
+    if (
+      req.method === "DELETE"
+      && parts[1] === "admin"
+      && parts[2] === "questionnaires"
+      && parts[3]
+      && !parts[4]
+    ) {
+      const admin = requireRole(context, ["admin"]);
+      const deleted = await deleteQuestionnaire({
+        questionnaireId: parts[3],
+        adminId: admin.id,
+      });
+
+      if (!deleted) {
+        throw new HttpError(404, "Сценарий не найден.");
+      }
+
+      sendJson(res, 200, { deleted: true });
       return;
     }
 
