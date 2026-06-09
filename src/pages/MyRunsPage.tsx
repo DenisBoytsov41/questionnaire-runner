@@ -193,7 +193,7 @@ export function MyRunsPage({
                       <h2>{title}</h2>
                       <p className="run-scenario-code">Код сценария: {run.questionnaireId}</p>
                       <p>
-                        Ответов: {Object.keys(run.answers).length}. Маршрут: {run.route.length} шагов.
+                        Ответов: {countRunAnswers(run)}. Маршрут: {run.route.length} шагов.
                       </p>
                     </div>
 
@@ -339,6 +339,14 @@ async function copyRunSummary(summaryText: string): Promise<string> {
   } catch {
     return "Не удалось скопировать итог.";
   }
+}
+
+function countRunAnswers(run: QuestionnaireRun): number {
+  return new Set(
+    run.route.filter((questionId) =>
+      Object.prototype.hasOwnProperty.call(run.answers, questionId),
+    ),
+  ).size;
 }
 
 function formatDateTime(value: string): string {

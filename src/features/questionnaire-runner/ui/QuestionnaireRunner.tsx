@@ -87,6 +87,11 @@ export function QuestionnaireRunner({ questionnaire, backendRun }: Questionnaire
     ? mainQuestions.findIndex((question) => question.id === state.currentQuestion?.id) + 1
     : mainQuestions.length;
   const isBranchQuestion = currentQuestionNumber <= 0;
+  const currentRouteIndex = state.currentQuestion
+    ? state.history.indexOf(state.currentQuestion.id)
+    : -1;
+  const canGoBack = currentRouteIndex > 0 || (currentRouteIndex < 0 && state.history.length > 0);
+  const answeredRouteCount = countAnsweredRouteQuestions(state);
 
   useEffect(() => {
     let timeoutId = 0;
@@ -209,7 +214,7 @@ export function QuestionnaireRunner({ questionnaire, backendRun }: Questionnaire
           isBranchQuestion={isBranchQuestion}
           initialAnswer={state.answers[state.currentQuestion.id]}
           validationError={state.validationError}
-          canGoBack={state.history.length > 0}
+          canGoBack={canGoBack}
           onAnswer={handleAnswer}
           onBack={() => dispatch({ type: "BACK" })}
           onFinish={() => dispatch({ type: "FINISH" })}
@@ -222,12 +227,13 @@ export function QuestionnaireRunner({ questionnaire, backendRun }: Questionnaire
           currentQuestionId={state.currentQuestion.id}
           completedRoute={state.history}
           totalQuestions={mainQuestions.length}
-          answeredCount={Object.keys(state.answers).length}
+          answeredCount={answeredRouteCount}
           startedAt={state.startedAt}
           draftSavedAt={lastSavedAt}
           serverSaveStatus={backendRun ? serverSaveStatus : undefined}
           serverSavedAt={serverSavedAt}
           serverSaveInProgress={serverSaveInProgress}
+          canGoBack={canGoBack}
           onBack={() => dispatch({ type: "BACK" })}
           onClearDraft={handleRestart}
           onNavigateToQuestion={(questionId) => {
@@ -247,12 +253,32 @@ export function QuestionnaireRunner({ questionnaire, backendRun }: Questionnaire
 function buildRunPayload(state: ReturnType<typeof createInitialRunnerState>): QuestionnaireRunPayload {
   return {
     currentQuestionId: state.currentQuestion?.id ?? null,
-    answers: state.answers,
+    answers: filterAnswersByRoute(state),
     route: state.history,
     messages: state.messages.map((message) => message.text),
     verdicts: state.verdicts.map((verdict) => verdict.text),
     summaryText: buildSummaryTextForBackend(state),
   };
+}
+
+function filterAnswersByRoute(
+  state: ReturnType<typeof createInitialRunnerState>,
+): QuestionnaireRunPayload["answers"] {
+  return state.history.reduce<QuestionnaireRunPayload["answers"]>((result, questionId) => {
+    if (Object.prototype.hasOwnProperty.call(state.answers, questionId)) {
+      result[questionId] = state.answers[questionId];
+    }
+
+    return result;
+  }, {});
+}
+
+function countAnsweredRouteQuestions(state: ReturnType<typeof createInitialRunnerState>): number {
+  return new Set(
+    state.history.filter((questionId) =>
+      Object.prototype.hasOwnProperty.call(state.answers, questionId),
+    ),
+  ).size;
 }
 
 function buildSummaryTextForBackend(state: ReturnType<typeof createInitialRunnerState>): string {

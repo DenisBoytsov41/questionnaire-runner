@@ -19,6 +19,7 @@ interface QuestionnaireMapProps {
   serverSaveStatus?: "idle" | "saving" | "saved" | "error";
   serverSavedAt?: string;
   serverSaveInProgress?: boolean;
+  canGoBack: boolean;
   onBack: () => void;
   onClearDraft: () => void;
   onNavigateToQuestion: (questionId: string) => void;
@@ -35,6 +36,7 @@ export function QuestionnaireMap({
   serverSaveStatus,
   serverSavedAt,
   serverSaveInProgress,
+  canGoBack,
   onBack,
   onClearDraft,
   onNavigateToQuestion,
@@ -60,7 +62,10 @@ export function QuestionnaireMap({
     [groupedQuestions, questionSearch],
   );
   const currentQuestion = questionnaire.questions.find((question) => question.id === currentQuestionId);
-  const currentStep = Math.min(completedRoute.length + 1, totalQuestions);
+  const currentRouteIndex = completedRoute.indexOf(currentQuestionId);
+  const currentStep = currentRouteIndex >= 0
+    ? currentRouteIndex + 1
+    : Math.min(completedRoute.length + 1, totalQuestions);
   const progressValue = totalQuestions > 0 ? Math.round((currentStep / totalQuestions) * 100) : 0;
 
   return (
@@ -83,7 +88,7 @@ export function QuestionnaireMap({
         <button
           type="button"
           className="secondary-button route-back-button"
-          disabled={completedRoute.length === 0}
+          disabled={!canGoBack}
           onClick={onBack}
         >
           Назад к предыдущему вопросу

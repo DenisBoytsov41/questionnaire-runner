@@ -112,8 +112,18 @@ export function runnerReducer(state: RunnerState, action: RunnerAction): RunnerS
   }
 
   if (action.type === "FINISH") {
+    const currentQuestionId = state.currentQuestion?.id;
+    const shouldIncludeCurrentQuestion = Boolean(
+      currentQuestionId
+      && !state.history.includes(currentQuestionId)
+      && Object.prototype.hasOwnProperty.call(state.answers, currentQuestionId),
+    );
+
     return {
       ...state,
+      history: shouldIncludeCurrentQuestion && currentQuestionId
+        ? [...state.history, currentQuestionId]
+        : state.history,
       isFinished: true,
       currentQuestion: null,
       validationError: "",
@@ -122,7 +132,12 @@ export function runnerReducer(state: RunnerState, action: RunnerAction): RunnerS
   }
 
   if (action.type === "BACK") {
-    const previousQuestionId = state.history[state.history.length - 1];
+    const currentQuestionIndex = state.currentQuestion
+      ? state.history.indexOf(state.currentQuestion.id)
+      : -1;
+    const previousQuestionId = currentQuestionIndex >= 0
+      ? state.history[currentQuestionIndex - 1]
+      : state.history[state.history.length - 1];
 
     if (!previousQuestionId) {
       return state;
@@ -139,7 +154,6 @@ export function runnerReducer(state: RunnerState, action: RunnerAction): RunnerS
     return {
       ...state,
       currentQuestion: previousQuestion,
-      history: state.history.slice(0, -1),
       isFinished: false,
       validationError: "",
       finishedAt: null,
@@ -161,24 +175,9 @@ export function runnerReducer(state: RunnerState, action: RunnerAction): RunnerS
       return state;
     }
 
-    const retainedQuestionIds = state.history.slice(0, targetIndex + 1);
-    const completedBeforeTargetIds = state.history.slice(0, targetIndex);
-    const completedBeforeTargetIdSet = new Set(completedBeforeTargetIds);
-    const answers = retainedQuestionIds.reduce<AnswersMap>((result, questionId) => {
-      if (Object.prototype.hasOwnProperty.call(state.answers, questionId)) {
-        result[questionId] = state.answers[questionId];
-      }
-
-      return result;
-    }, {});
-
     return {
       ...state,
       currentQuestion,
-      answers,
-      history: state.history.slice(0, targetIndex),
-      messages: state.messages.filter((item) => completedBeforeTargetIdSet.has(item.questionId)),
-      verdicts: state.verdicts.filter((item) => completedBeforeTargetIdSet.has(item.questionId)),
       isFinished: false,
       validationError: "",
       finishedAt: null,
@@ -207,23 +206,31 @@ export function runnerReducer(state: RunnerState, action: RunnerAction): RunnerS
       answer,
     );
 
-    const actualRouteIds = [...state.history, currentQuestion.id];
+    const currentRouteIndex = state.history.indexOf(currentQuestion.id);
+    const routeThroughCurrent = currentRouteIndex >= 0
+      ? state.history.slice(0, currentRouteIndex + 1)
+      : [...state.history, currentQuestion.id];
+    const existingNextQuestionId = currentRouteIndex >= 0
+      ? state.history[currentRouteIndex + 1]
+      : undefined;
+    const nextQuestionId = transition.nextQuestion?.id;
+    const continuesAlongExistingRoute = Boolean(
+      nextQuestionId && existingNextQuestionId === nextQuestionId,
+    );
+    const actualRouteIds = continuesAlongExistingRoute
+      ? state.history
+      : routeThroughCurrent;
     const actualRouteIdSet = new Set(actualRouteIds);
-    const answers = actualRouteIds.reduce<AnswersMap>((result, questionId) => {
-      if (questionId === currentQuestion.id) {
-        result[questionId] = answer;
-        return result;
-      }
-
-      if (Object.prototype.hasOwnProperty.call(state.answers, questionId)) {
-        result[questionId] = state.answers[questionId];
-      }
-
-      return result;
-    }, {});
-
-    const messages = state.messages.filter((item) => actualRouteIdSet.has(item.questionId));
-    const verdicts = state.verdicts.filter((item) => actualRouteIdSet.has(item.questionId));
+    const answers = {
+      ...state.answers,
+      [currentQuestion.id]: answer,
+    };
+    const messages = state.messages.filter(
+      (item) => actualRouteIdSet.has(item.questionId) && item.questionId !== currentQuestion.id,
+    );
+    const verdicts = state.verdicts.filter(
+      (item) => actualRouteIdSet.has(item.questionId) && item.questionId !== currentQuestion.id,
+    );
 
     if (transition.message.trim()) {
       messages.push({
