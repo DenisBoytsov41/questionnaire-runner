@@ -51,6 +51,7 @@ export const questionnaireQuestionSchema = z.object({
   order: z.number(),
   active: z.boolean(),
   show_in_summary: z.boolean(),
+  start_node: z.boolean().default(false),
   options: z.array(questionnaireOptionSchema).optional(),
   rules: z.array(questionnaireRuleSchema).optional(),
 });
@@ -70,7 +71,7 @@ export const singleQuestionnaireSchema = z.object({
 });
 
 export const questionnaireBundleSchema = z.object({
-  schema: z.literal("first_line_questionnaires_bundle"),
+  schema: z.enum(["first_line_questionnaires_bundle", "first_line_questionnaire_package"]),
   schema_version: z.number().default(1),
   exported_at: z.string().optional(),
   exported_from: z.string().optional(),
@@ -95,5 +96,5 @@ export type QuestionnaireInput = z.infer<typeof questionnaireInputSchema>;
 export function isQuestionnaireBundle(
   value: QuestionnaireInput
 ): value is QuestionnaireBundle {
-  return value.schema === "first_line_questionnaires_bundle";
+  return value.schema === "first_line_questionnaires_bundle" || value.schema === "first_line_questionnaire_package";
 }

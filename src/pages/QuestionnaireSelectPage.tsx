@@ -1,11 +1,13 @@
 import type { Questionnaire } from "../entities/questionnaire/types";
 import type { CurrentUser, UserPreferences } from "../shared/api/backendApi";
-import { BrandHeader, type SettingsStatus } from "../shared/ui/BrandHeader";
+import { BrandHeader, type HeaderNavigationItem, type SettingsStatus } from "../shared/ui/BrandHeader";
+import { Pagination } from "../shared/ui/Pagination";
+import { usePagination } from "../shared/ui/usePagination";
 
 interface QuestionnaireSelectPageProps {
   questionnaires: Questionnaire[];
   onSelectQuestionnaire: (questionnaire: Questionnaire) => void;
-  onReset: () => void;
+  navigationItems?: HeaderNavigationItem[];
   user: CurrentUser;
   settings: UserPreferences;
   settingsStatus: SettingsStatus;
@@ -17,7 +19,7 @@ interface QuestionnaireSelectPageProps {
 export function QuestionnaireSelectPage({
   questionnaires,
   onSelectQuestionnaire,
-  onReset,
+  navigationItems,
   user,
   settings,
   settingsStatus,
@@ -25,14 +27,16 @@ export function QuestionnaireSelectPage({
   onOpenProfile,
   onLogout,
 }: QuestionnaireSelectPageProps) {
+  const questionnairesPagination = usePagination(questionnaires, {
+    defaultPageSize: 5,
+    resetKey: String(questionnaires.length),
+  });
+
   return (
     <main className="app-shell">
       <BrandHeader
         subtitle="Выбор сценария из файла"
-        action={{
-          label: "Загрузить другой файл",
-          onClick: onReset,
-        }}
+        navigationItems={navigationItems}
         user={user}
         settings={settings}
         settingsStatus={settingsStatus}
@@ -52,7 +56,7 @@ export function QuestionnaireSelectPage({
         </div>
 
         <div className="questionnaire-grid">
-          {questionnaires.map((questionnaire) => (
+          {questionnairesPagination.pageItems.map((questionnaire) => (
             <article key={questionnaire.id} className="questionnaire-card">
               <div className="questionnaire-card-header">
                 <div>
@@ -88,6 +92,15 @@ export function QuestionnaireSelectPage({
             </article>
           ))}
         </div>
+        <Pagination
+          label="сценариев"
+          page={questionnairesPagination.page}
+          pageSize={questionnairesPagination.pageSize}
+          totalItems={questionnairesPagination.totalItems}
+          totalPages={questionnairesPagination.totalPages}
+          onPageChange={questionnairesPagination.setPage}
+          onPageSizeChange={questionnairesPagination.setPageSize}
+        />
       </section>
     </main>
   );

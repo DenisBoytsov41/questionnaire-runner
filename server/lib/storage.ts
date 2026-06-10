@@ -9,7 +9,8 @@ import type {
   UserRole,
 } from "../types.js";
 import type { Questionnaire } from "./questionnaireContract.js";
-import { createId, hashPassword, toPublicUser } from "./crypto.js";
+import { createId, hashPassword, toPublicUser, verifyPassword } from "./crypto.js";
+import { logWarn } from "./logger.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -18,6 +19,21 @@ if (!databaseUrl) {
 }
 
 const pool = new Pool({ connectionString: databaseUrl });
+const maxAvatarImagePayloadLength = 14_500_000;
+
+pool.on("error", (error: Error & { code?: string }) => {
+  const code = error.code ?? "unknown";
+
+  if (code === "57P01" || code === "57P02" || code === "57P03") {
+    logWarn("database", "PostgreSQL закрыл простаивающее соединение", { code });
+    return;
+  }
+
+  logWarn("database", "Ошибка простаивающего соединения PostgreSQL", {
+    code,
+    message: error.message,
+  });
+});
 
 const defaultPreferences: UserPreferences = {
   theme: "light",
@@ -28,9 +44,37 @@ const defaultPreferences: UserPreferences = {
   avatarImage: "",
 };
 
+const defaultPageSize = 10;
+const maxPageSize = 100;
+
+export interface PaginationInput {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  role?: UserRole | "all";
+  status?: QuestionnaireRun["status"] | "all";
+}
+
+export interface PaginationMeta {
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+}
+
+export interface PaginatedResult<T, TSummary = undefined> {
+  items: T[];
+  pagination: PaginationMeta;
+  summary?: TSummary;
+}
+
 export async function checkDatabase(): Promise<void> {
   await ensureInitialAdmin();
   await pool.query("select 1");
+}
+
+export async function closeDatabase(): Promise<void> {
+  await pool.end();
 }
 
 export async function getUserById(userId: string): Promise<StoredUser | null> {
@@ -54,17 +98,52 @@ export async function listUsers(): Promise<PublicUser[]> {
   return result.rows.map(mapUser).map(toPublicUser);
 }
 
+export async function listUsersPage(input: PaginationInput = {}): Promise<PaginatedResult<PublicUser>> {
+  await ensureInitialAdmin();
+  const { page: requestedPage, pageSize, search } = sanitizePagination(input);
+  const params: unknown[] = [];
+  const conditions: string[] = [];
+
+  if (input.role && input.role !== "all") {
+    params.push(input.role);
+    conditions.push(`role = $${params.length}`);
+  }
+
+  addSearchCondition(conditions, params, ["login", "full_name", "email", "phone", "position"], search);
+
+  const whereSql = conditions.length ? `where ${conditions.join(" and ")}` : "";
+  const totalItems = await countRows(`select count(*)::int as count from users ${whereSql}`, params);
+  const pagination = buildPagination(totalItems, requestedPage, pageSize);
+  const pageParams = [...params, pagination.pageSize, (pagination.page - 1) * pagination.pageSize];
+  const result = await pool.query<UserRow>(
+    userSelectSql(` ${whereSql} order by created_at, login limit $${pageParams.length - 1} offset $${pageParams.length}`),
+    pageParams,
+  );
+
+  return {
+    items: result.rows.map(mapUser).map(toPublicUser),
+    pagination,
+  };
+}
+
 export async function createUser(input: {
   login: string;
   password: string;
   fullName: string;
+  email?: string;
+  phone?: string;
+  position?: string;
+  role?: UserRole;
+  active?: boolean;
 }): Promise<PublicUser> {
   return inTransaction(async (client) => {
     await ensureInitialAdmin(client);
 
+    const login = input.login.trim();
+    const fullName = input.fullName.trim();
     const exists = await client.query<{ id: string }>(
       "select id from users where lower(login) = lower($1)",
-      [input.login],
+      [login],
     );
 
     if (exists.rowCount) {
@@ -75,13 +154,13 @@ export async function createUser(input: {
     const { hash, salt } = hashPassword(input.password);
     const user: StoredUser = {
       id: createId("usr"),
-      login: input.login,
-      fullName: input.fullName,
-      email: "",
-      phone: "",
-      position: "",
-      role: "user",
-      active: true,
+      login,
+      fullName,
+      email: input.email?.trim() ?? "",
+      phone: input.phone?.trim() ?? "",
+      position: input.position?.trim() ?? "",
+      role: input.role ?? "user",
+      active: input.active ?? true,
       preferences: defaultPreferences,
       passwordHash: hash,
       passwordSalt: salt,
@@ -90,7 +169,11 @@ export async function createUser(input: {
     };
 
     await insertUser(client, user);
-    await addAuditLog(client, user.id, "user.registered", "user", user.id, { login: user.login });
+    await addAuditLog(client, user.id, "user.registered", "user", user.id, {
+      login: user.login,
+      role: user.role,
+      active: user.active,
+    });
 
     return toPublicUser(user);
   });
@@ -173,6 +256,45 @@ export async function updateUserProfile(input: {
     }
 
     return user ? toPublicUser(user) : null;
+  });
+}
+
+export async function changeUserPassword(input: {
+  userId: string;
+  currentPassword: string;
+  newPassword: string;
+}): Promise<void> {
+  return inTransaction(async (client) => {
+    await ensureInitialAdmin(client);
+
+    const current = await client.query<UserRow>(userSelectSql("where id = $1"), [input.userId]);
+    const user = current.rows[0] ? mapUser(current.rows[0]) : null;
+
+    if (!user || !user.active) {
+      throw new StorageForbiddenError("Пользователь не найден или вход закрыт.");
+    }
+
+    if (!verifyPassword(input.currentPassword, user)) {
+      throw new StorageForbiddenError("Текущий пароль указан неверно.");
+    }
+
+    if (input.currentPassword === input.newPassword) {
+      throw new StorageConflictError("Новый пароль должен отличаться от текущего.");
+    }
+
+    const { hash, salt } = hashPassword(input.newPassword);
+
+    await client.query(
+      `
+        update users
+        set password_hash = $2,
+            password_salt = $3,
+            updated_at = now()
+        where id = $1
+      `,
+      [input.userId, hash, salt],
+    );
+    await addAuditLog(client, user.id, "user.password_changed", "user", user.id, {});
   });
 }
 
@@ -316,6 +438,222 @@ export async function publishQuestionnaireVersion(input: {
   });
 }
 
+export async function deleteQuestionnaireVersion(input: {
+  questionnaireId: string;
+  versionId: string;
+  adminId: string;
+}): Promise<boolean> {
+  return inTransaction(async (client) => {
+    const versionResult = await client.query<QuestionnaireVersionRow>(
+      versionSelectSql("where id = $1 and questionnaire_id = $2"),
+      [input.versionId, input.questionnaireId],
+    );
+    const version = versionResult.rows[0] ? mapQuestionnaireVersion(versionResult.rows[0]) : null;
+
+    if (!version) {
+      return false;
+    }
+
+    const runCount = await client.query<{ count: number }>(
+      "select count(*)::int as count from questionnaire_runs where questionnaire_version_id = $1",
+      [input.versionId],
+    );
+
+    if ((runCount.rows[0]?.count ?? 0) > 0) {
+      throw new StorageConflictError(
+        `Версию ${version.version} нельзя удалить: по ней уже есть черновики или завершённые прохождения.`,
+      );
+    }
+
+    const versionCount = await client.query<{ count: number }>(
+      "select count(*)::int as count from questionnaire_versions where questionnaire_id = $1",
+      [input.questionnaireId],
+    );
+
+    if ((versionCount.rows[0]?.count ?? 0) <= 1) {
+      throw new StorageConflictError(
+        "Это единственная версия сценария. Для полного удаления используйте кнопку «Удалить сценарий».",
+      );
+    }
+
+    await client.query(
+      `
+        update questionnaires
+        set active_version_id = null,
+            archived = true,
+            updated_at = now()
+        where id = $1 and active_version_id = $2
+      `,
+      [input.questionnaireId, input.versionId],
+    );
+    await client.query("delete from questionnaire_versions where id = $1", [input.versionId]);
+    await addAuditLog(client, input.adminId, "questionnaire.version_deleted", "questionnaire", input.questionnaireId, {
+      versionId: input.versionId,
+      version: version.version,
+    });
+
+    return true;
+  });
+}
+
+export async function deleteQuestionnaire(input: {
+  questionnaireId: string;
+  adminId: string;
+}): Promise<boolean> {
+  return inTransaction(async (client) => {
+    const questionnaireResult = await client.query<QuestionnaireRow>(
+      questionnaireSelectSql("where id = $1"),
+      [input.questionnaireId],
+    );
+    const questionnaire = questionnaireResult.rows[0]
+      ? mapQuestionnaire(questionnaireResult.rows[0])
+      : null;
+
+    if (!questionnaire) {
+      return false;
+    }
+
+    const runCount = await client.query<{ count: number }>(
+      "select count(*)::int as count from questionnaire_runs where questionnaire_id = $1",
+      [input.questionnaireId],
+    );
+
+    if ((runCount.rows[0]?.count ?? 0) > 0) {
+      throw new StorageConflictError(
+        "Сценарий нельзя удалить: по нему уже есть черновики или завершённые прохождения.",
+      );
+    }
+
+    await client.query(
+      "update questionnaires set active_version_id = null where id = $1",
+      [input.questionnaireId],
+    );
+    await client.query(
+      "delete from questionnaire_versions where questionnaire_id = $1",
+      [input.questionnaireId],
+    );
+    await client.query("delete from questionnaires where id = $1", [input.questionnaireId]);
+    await addAuditLog(client, input.adminId, "questionnaire.deleted", "questionnaire", input.questionnaireId, {
+      title: questionnaire.title,
+    });
+
+    return true;
+  });
+}
+
+export async function listQuestionnairesForAdmin() {
+  await ensureInitialAdmin();
+
+  const questionnairesResult = await pool.query<QuestionnaireRow>(
+    questionnaireSelectSql("order by updated_at desc, title"),
+  );
+  const versionsResult = await pool.query<QuestionnaireVersionRow>(
+    versionSelectSql("order by questionnaire_id, version desc"),
+  );
+  const versionsByQuestionnaire = new Map<string, StoredQuestionnaireVersion[]>();
+
+  for (const row of versionsResult.rows) {
+    const version = mapQuestionnaireVersion(row);
+    const versions = versionsByQuestionnaire.get(version.questionnaireId) ?? [];
+
+    versions.push(version);
+    versionsByQuestionnaire.set(version.questionnaireId, versions);
+  }
+
+  return questionnairesResult.rows.map((row) => {
+    const questionnaire = mapQuestionnaire(row);
+    const versions = versionsByQuestionnaire.get(questionnaire.id) ?? [];
+
+    return {
+      ...questionnaire,
+      versions: versions.map((version) => ({
+        id: version.id,
+        questionnaireId: version.questionnaireId,
+        version: version.version,
+        title: version.title,
+        active: version.active,
+        published: version.published,
+        importedBy: version.importedBy,
+        importedAt: version.importedAt,
+      })),
+    };
+  });
+}
+
+export async function listQuestionnairesForAdminPage(input: PaginationInput = {}) {
+  await ensureInitialAdmin();
+  const { page: requestedPage, pageSize, search } = sanitizePagination(input);
+  const params: unknown[] = [];
+  const conditions: string[] = [];
+
+  addQuestionnaireSearchCondition(conditions, params, search);
+
+  const whereSql = conditions.length ? `where ${conditions.join(" and ")}` : "";
+  const totalItems = await countRows(`select count(*)::int as count from questionnaires ${whereSql}`, params);
+  const activeItems = await countRows(
+    `select count(*)::int as count from questionnaires ${conditions.length ? `where ${conditions.join(" and ")} and archived = false` : "where archived = false"}`,
+    params,
+  );
+  const totalVersions = await countRows(
+    `
+      select count(*)::int as count
+      from questionnaire_versions
+      join questionnaires on questionnaires.id = questionnaire_versions.questionnaire_id
+      ${whereSql}
+    `,
+    params,
+  );
+  const pagination = buildPagination(totalItems, requestedPage, pageSize);
+  const pageParams = [...params, pagination.pageSize, (pagination.page - 1) * pagination.pageSize];
+  const questionnairesResult = await pool.query<QuestionnaireRow>(
+    questionnaireSelectSql(` ${whereSql} order by updated_at desc, title limit $${pageParams.length - 1} offset $${pageParams.length}`),
+    pageParams,
+  );
+  const questionnaireIds = questionnairesResult.rows.map((row) => row.id);
+  const versionsResult = questionnaireIds.length
+    ? await pool.query<QuestionnaireVersionRow>(
+      versionSelectSql("where questionnaire_id = any($1::text[]) order by questionnaire_id, version desc"),
+      [questionnaireIds],
+    )
+    : { rows: [] as QuestionnaireVersionRow[] };
+  const versionsByQuestionnaire = new Map<string, StoredQuestionnaireVersion[]>();
+
+  for (const row of versionsResult.rows) {
+    const version = mapQuestionnaireVersion(row);
+    const versions = versionsByQuestionnaire.get(version.questionnaireId) ?? [];
+
+    versions.push(version);
+    versionsByQuestionnaire.set(version.questionnaireId, versions);
+  }
+
+  return {
+    items: questionnairesResult.rows.map((row) => {
+      const questionnaire = mapQuestionnaire(row);
+      const versions = versionsByQuestionnaire.get(questionnaire.id) ?? [];
+
+      return {
+        ...questionnaire,
+        versions: versions.map((version) => ({
+          id: version.id,
+          questionnaireId: version.questionnaireId,
+          version: version.version,
+          title: version.title,
+          active: version.active,
+          published: version.published,
+          importedBy: version.importedBy,
+          importedAt: version.importedAt,
+        })),
+      };
+    }),
+    pagination,
+    summary: {
+      totalQuestionnaires: totalItems,
+      totalVersions,
+      activeQuestionnaires: activeItems,
+    },
+  };
+}
+
 export async function listPublishedQuestionnaires() {
   await ensureInitialAdmin();
   const result = await pool.query<PublishedQuestionnaireRow>(`
@@ -338,6 +676,55 @@ export async function listPublishedQuestionnaires() {
     version: row.version,
     importedAt: toIso(row.imported_at),
   }));
+}
+
+export async function listPublishedQuestionnairesPage(input: PaginationInput = {}) {
+  await ensureInitialAdmin();
+  const { page: requestedPage, pageSize, search } = sanitizePagination(input);
+  const params: unknown[] = [];
+  const conditions = ["q.archived = false", "v.published = true"];
+
+  addSearchCondition(conditions, params, ["q.id", "q.title"], search, ["cast(v.version as text)"]);
+
+  const whereSql = `where ${conditions.join(" and ")}`;
+  const totalItems = await countRows(
+    `
+      select count(*)::int as count
+      from questionnaires q
+      join questionnaire_versions v on v.id = q.active_version_id
+      ${whereSql}
+    `,
+    params,
+  );
+  const pagination = buildPagination(totalItems, requestedPage, pageSize);
+  const pageParams = [...params, pagination.pageSize, (pagination.page - 1) * pagination.pageSize];
+  const result = await pool.query<PublishedQuestionnaireRow>(
+    `
+      select
+        q.id,
+        q.title,
+        q.active_version_id,
+        v.version,
+        v.imported_at
+      from questionnaires q
+      join questionnaire_versions v on v.id = q.active_version_id
+      ${whereSql}
+      order by q.title
+      limit $${pageParams.length - 1} offset $${pageParams.length}
+    `,
+    pageParams,
+  );
+
+  return {
+    items: result.rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      activeVersionId: row.active_version_id,
+      version: row.version,
+      importedAt: toIso(row.imported_at),
+    })),
+    pagination,
+  };
 }
 
 export async function getPublishedQuestionnaire(questionnaireId: string) {
@@ -379,6 +766,22 @@ export async function createRun(questionnaireId: string, operatorId: string): Pr
 
     if (!item?.activeVersionId) {
       return null;
+    }
+
+    await client.query("select pg_advisory_xact_lock(hashtext($1))", [
+      `${operatorId}:${questionnaireId}:${item.activeVersionId}`,
+    ]);
+
+    const existingDraft = await client.query<QuestionnaireRunRow>(
+      runSelectSql(
+        "where operator_id = $1 and questionnaire_id = $2 and questionnaire_version_id = $3 and status = 'draft' order by updated_at desc limit 1",
+      ),
+      [operatorId, questionnaireId, item.activeVersionId],
+    );
+    const existingRun = existingDraft.rows[0] ? mapQuestionnaireRun(existingDraft.rows[0]) : null;
+
+    if (existingRun) {
+      return existingRun;
     }
 
     const now = new Date().toISOString();
@@ -434,6 +837,100 @@ export async function listRunsForUser(userId: string, role: UserRole): Promise<Q
   return result.rows.map(mapQuestionnaireRun);
 }
 
+export async function listRunsForUserPage(
+  userId: string,
+  role: UserRole,
+  input: PaginationInput = {},
+): Promise<PaginatedResult<QuestionnaireRun, {
+  totalRuns: number;
+  draftRuns: number;
+  finishedRuns: number;
+}>> {
+  await ensureInitialAdmin();
+  const { page: requestedPage, pageSize, search } = sanitizePagination(input);
+  const params: unknown[] = [];
+  const conditions: string[] = [];
+
+  if (role !== "admin") {
+    params.push(userId);
+    conditions.push(`operator_id = $${params.length}`);
+  }
+
+  if (input.status && input.status !== "all") {
+    params.push(input.status);
+    conditions.push(`status = $${params.length}`);
+  }
+
+  addSearchCondition(
+    conditions,
+    params,
+    ["id", "questionnaire_id", "questionnaire_version_id", "coalesce(current_question_id, '')", "coalesce(summary_text, '')"],
+    search,
+  );
+
+  const whereSql = conditions.length ? `where ${conditions.join(" and ")}` : "";
+  const totalItems = await countRows(`select count(*)::int as count from questionnaire_runs ${whereSql}`, params);
+  const draftItems = await countRows(
+    `select count(*)::int as count from questionnaire_runs ${conditions.length ? `where ${conditions.join(" and ")} and status = 'draft'` : "where status = 'draft'"}`,
+    params,
+  );
+  const finishedItems = await countRows(
+    `select count(*)::int as count from questionnaire_runs ${conditions.length ? `where ${conditions.join(" and ")} and status = 'finished'` : "where status = 'finished'"}`,
+    params,
+  );
+  const pagination = buildPagination(totalItems, requestedPage, pageSize);
+  const pageParams = [...params, pagination.pageSize, (pagination.page - 1) * pagination.pageSize];
+  const result = await pool.query<QuestionnaireRunRow>(
+    runSelectSql(` ${whereSql} order by started_at desc limit $${pageParams.length - 1} offset $${pageParams.length}`),
+    pageParams,
+  );
+
+  return {
+    items: result.rows.map(mapQuestionnaireRun),
+    pagination,
+    summary: {
+      totalRuns: totalItems,
+      draftRuns: draftItems,
+      finishedRuns: finishedItems,
+    },
+  };
+}
+
+export async function deleteDraftRun(input: {
+  runId: string;
+  userId: string;
+  role: UserRole;
+}): Promise<boolean> {
+  return inTransaction(async (client) => {
+    const currentResult = await client.query<QuestionnaireRunRow>(runSelectSql("where id = $1"), [input.runId]);
+    const currentRun = currentResult.rows[0] ? mapQuestionnaireRun(currentResult.rows[0]) : null;
+
+    if (!currentRun) {
+      return false;
+    }
+
+    if (input.role !== "admin" && currentRun.operatorId !== input.userId) {
+      throw new StorageForbiddenError("Нет доступа к этому прохождению.");
+    }
+
+    if (currentRun.status !== "draft") {
+      throw new StorageConflictError("Удалить можно только черновик. Завершённое прохождение остаётся в истории.");
+    }
+
+    await client.query("delete from questionnaire_runs where id = $1", [input.runId]);
+    await addAuditLog(
+      client,
+      input.userId,
+      "run.draft_deleted",
+      "questionnaire_run",
+      input.runId,
+      { questionnaireId: currentRun.questionnaireId },
+    );
+
+    return true;
+  });
+}
+
 export async function updateRunDraft(input: {
   runId: string;
   userId: string;
@@ -468,6 +965,12 @@ async function updateRun(input: {
 
     if (input.role !== "admin" && currentRun.operatorId !== input.userId) {
       throw new StorageForbiddenError("Нет доступа к этому прохождению.");
+    }
+
+    if (currentRun.status === "finished" && status === "draft") {
+      throw new StorageConflictError(
+        "Завершённое прохождение нельзя снова перевести в черновик.",
+      );
     }
 
     const result = await client.query<QuestionnaireRunRow>(
@@ -554,7 +1057,7 @@ async function ensureInitialAdmin(existingClient?: PoolClient): Promise<void> {
 
     const now = new Date().toISOString();
     const adminLogin = process.env.ADMIN_LOGIN?.trim() || "admin";
-    const adminPassword = process.env.ADMIN_PASSWORD?.trim() || "admin123";
+    const adminPassword = process.env.ADMIN_PASSWORD?.trim() || "KService-Admin-2026!";
     const { hash, salt } = hashPassword(adminPassword);
 
     await insertUser(client, {
@@ -660,6 +1163,77 @@ async function insertRun(client: PoolClient, run: QuestionnaireRun): Promise<voi
       run.finishedAt,
     ],
   );
+}
+
+function sanitizePagination(input: PaginationInput): Required<Pick<PaginationInput, "page" | "pageSize" | "search">> {
+  const page = Number.isFinite(input.page) ? Math.max(1, Math.floor(input.page ?? 1)) : 1;
+  const rawPageSize = Number.isFinite(input.pageSize)
+    ? Math.max(1, Math.floor(input.pageSize ?? defaultPageSize))
+    : defaultPageSize;
+
+  return {
+    page,
+    pageSize: Math.min(rawPageSize, maxPageSize),
+    search: input.search?.trim().toLowerCase() ?? "",
+  };
+}
+
+function buildPagination(totalItems: number, requestedPage: number, pageSize: number): PaginationMeta {
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+
+  return {
+    page: Math.min(requestedPage, totalPages),
+    pageSize,
+    totalItems,
+    totalPages,
+  };
+}
+
+async function countRows(sql: string, params: unknown[]): Promise<number> {
+  const result = await pool.query<CountRow>(sql, params);
+
+  return Number(result.rows[0]?.count ?? 0);
+}
+
+function addSearchCondition(
+  conditions: string[],
+  params: unknown[],
+  fields: string[],
+  search: string,
+  rawFields: string[] = [],
+): void {
+  if (!search) {
+    return;
+  }
+
+  params.push(`%${search}%`);
+  const placeholder = `$${params.length}`;
+  const fieldConditions = [
+    ...fields.map((field) => `lower(${field}) like ${placeholder}`),
+    ...rawFields.map((field) => `lower(${field}) like ${placeholder}`),
+  ];
+
+  conditions.push(`(${fieldConditions.join(" or ")})`);
+}
+
+function addQuestionnaireSearchCondition(conditions: string[], params: unknown[], search: string): void {
+  if (!search) {
+    return;
+  }
+
+  params.push(`%${search}%`);
+  const placeholder = `$${params.length}`;
+
+  conditions.push(`(
+    lower(id) like ${placeholder}
+    or lower(title) like ${placeholder}
+    or exists (
+      select 1
+      from questionnaire_versions
+      where questionnaire_versions.questionnaire_id = questionnaires.id
+        and cast(questionnaire_versions.version as text) like ${placeholder}
+    )
+  )`);
 }
 
 async function addAuditLog(
@@ -845,7 +1419,7 @@ function normalizeProfileColor(value: unknown): UserPreferences["profileColor"] 
 }
 
 function normalizeAvatarImage(value: unknown): string {
-  if (typeof value === "string" && value.startsWith("data:image/") && value.length <= 900_000) {
+  if (typeof value === "string" && value.startsWith("data:image/") && value.length <= maxAvatarImagePayloadLength) {
     return value;
   }
 
@@ -923,4 +1497,8 @@ interface QuestionnaireWithVersionRow {
   title: string;
   version: number;
   source_json: Questionnaire;
+}
+
+interface CountRow {
+  count: string | number;
 }

@@ -3,6 +3,8 @@ import type { PublicUser, UserRole } from "../types.js";
 import { getUserById } from "./storage.js";
 import { toPublicUser, verifyToken } from "./crypto.js";
 
+const maxJsonBodyBytes = 20 * 1024 * 1024;
+
 export interface RequestContext {
   req: IncomingMessage;
   res: ServerResponse;
@@ -42,12 +44,21 @@ export async function createContext(
 
 export async function readJsonBody<T>(req: IncomingMessage): Promise<T> {
   const chunks: Buffer[] = [];
+  let bodyBytes = 0;
 
   for await (const chunk of req) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+
+    bodyBytes += buffer.byteLength;
+
+    if (bodyBytes > maxJsonBodyBytes) {
+      throw new HttpError(413, "Тело запроса слишком большое. Максимальный размер JSON-запроса - 20 МБ.");
+    }
+
+    chunks.push(buffer);
   }
 
-  const rawBody = Buffer.concat(chunks).toString("utf8");
+  const rawBody = stripJsonBom(Buffer.concat(chunks).toString("utf8"));
 
   if (!rawBody.trim()) {
     return {} as T;
@@ -60,10 +71,14 @@ export async function readJsonBody<T>(req: IncomingMessage): Promise<T> {
   }
 }
 
+function stripJsonBom(text: string): string {
+  return text.replace(/^\uFEFF/, "");
+}
+
 export function sendJson(res: ServerResponse, status: number, payload: unknown): void {
   res.writeHead(status, {
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    "Access-Control-Allow-Methods": "GET, POST, PATCH, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
     "Access-Control-Allow-Origin": process.env.CORS_ORIGIN ?? "*",
     "Content-Type": "application/json; charset=utf-8",
   });
@@ -73,7 +88,7 @@ export function sendJson(res: ServerResponse, status: number, payload: unknown):
 export function sendHtml(res: ServerResponse, status: number, html: string): void {
   res.writeHead(status, {
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    "Access-Control-Allow-Methods": "GET, POST, PATCH, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
     "Access-Control-Allow-Origin": process.env.CORS_ORIGIN ?? "*",
     "Content-Type": "text/html; charset=utf-8",
   });

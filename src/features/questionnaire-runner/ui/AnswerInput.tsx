@@ -3,6 +3,7 @@ import type {
   QuestionnaireQuestion,
   QuestionAnswer,
 } from "../../../entities/questionnaire/types";
+import { RoundedSelect } from "../../../shared/ui/RoundedSelect";
 
 interface AnswerInputProps {
   question: QuestionnaireQuestion;
@@ -92,20 +93,17 @@ export function AnswerInput({
     const options = getActiveOptions(question);
 
     return (
-      <select
-        className="answer-input"
+      <RoundedSelect
+        className="answer-select"
         value={typeof value === "string" ? value : ""}
-        onChange={(event) => updateValue(event.target.value)}
+        options={[
+          { value: "", label: "Выберите вариант" },
+          ...options.map((option) => ({ value: option.value, label: option.title })),
+        ]}
+        ariaLabel={question.title}
+        onChange={(nextValue) => updateValue(nextValue)}
         autoFocus
-      >
-        <option value="">Выберите вариант</option>
-
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.title}
-          </option>
-        ))}
-      </select>
+      />
     );
   }
 

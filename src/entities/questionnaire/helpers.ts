@@ -93,8 +93,9 @@ export function getFirstActiveQuestion(
   questionnaire: Questionnaire,
 ): QuestionnaireQuestion | null {
   const questions = getMainFlowQuestions(questionnaire);
+  const startQuestion = questions.find((question) => question.start_node);
 
-  return questions.length > 0 ? questions[0] : null;
+  return startQuestion ?? (questions.length > 0 ? questions[0] : null);
 }
 
 export function getNextQuestionByOrder(

@@ -28,7 +28,7 @@ npm run dev:server
 
 ```text
 Логин: admin
-Пароль: admin123
+Пароль: значение ADMIN_PASSWORD из .env
 ```
 
 ## Запуск в Docker
@@ -79,10 +79,10 @@ npm run docker:logs
 
 ```powershell
 $env:ADMIN_LOGIN="admin"
-$env:ADMIN_PASSWORD="strong-password"
+$env:ADMIN_PASSWORD="replace-with-unique-admin-password"
 $env:JWT_SECRET="local-secret"
 $env:SWAGGER_USER="docs"
-$env:SWAGGER_PASSWORD="docs-password"
+$env:SWAGGER_PASSWORD="replace-with-unique-api-docs-secret"
 npm run dev:server
 ```
 
@@ -127,7 +127,7 @@ SWAGGER_USER
 SWAGGER_PASSWORD
 ```
 
-По умолчанию для разработки используются `admin` / `admin123`, но для нормального окружения их нужно заменить.
+По умолчанию для разработки используется логин `admin`, а пароль берётся из `ADMIN_PASSWORD`. Для нормального окружения задайте своё уникальное значение.
 
 ## Роли
 
@@ -166,7 +166,7 @@ POST  /api/questionnaire-runs/:id/finish
 $login = Invoke-RestMethod -Method Post `
   -Uri http://localhost:4100/api/auth/login `
   -ContentType 'application/json' `
-  -Body '{"login":"admin","password":"admin123"}'
+  -Body '{"login":"admin","password":"<ADMIN_PASSWORD из .env>"}'
 
 $token = $login.token
 $json = Get-Content -Path 'public/questionnaires/Чек-лист звонка по ККТ.json' -Raw -Encoding utf8

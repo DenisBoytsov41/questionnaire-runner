@@ -10,7 +10,7 @@ interface LoginPageProps {
 
 export function LoginPage({ onLogin, message }: LoginPageProps) {
   const [login, setLogin] = useState("admin");
-  const [password, setPassword] = useState("admin123");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 

@@ -30,9 +30,51 @@ export type CurrentUser = {
   preferences: UserPreferences;
 };
 
+export type AdminUser = CurrentUser;
+
 export type LoginResult = {
   token: string;
   user: CurrentUser;
+};
+
+export type PaginationMeta = {
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+};
+
+export type PaginatedList<T> = {
+  items: T[];
+  pagination: PaginationMeta;
+};
+
+export type AdminQuestionnairesSummary = {
+  totalQuestionnaires: number;
+  totalVersions: number;
+  activeQuestionnaires: number;
+};
+
+export type AdminQuestionnairesPageData = PaginatedList<AdminQuestionnaire> & {
+  summary: AdminQuestionnairesSummary;
+};
+
+export type QuestionnaireRunsSummary = {
+  totalRuns: number;
+  draftRuns: number;
+  finishedRuns: number;
+};
+
+export type QuestionnaireRunsPageData = PaginatedList<QuestionnaireRun> & {
+  summary: QuestionnaireRunsSummary;
+};
+
+export type ListPageParams = {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  role?: UserRole | "all";
+  status?: QuestionnaireRunStatus | "all";
 };
 
 export type UpdateProfileInput = Partial<{
@@ -42,6 +84,27 @@ export type UpdateProfileInput = Partial<{
   position: string;
   preferences: UserPreferences;
 }>;
+
+export type ChangePasswordInput = {
+  currentPassword: string;
+  newPassword: string;
+};
+
+export type UpdateUserAccessInput = {
+  role: UserRole;
+  active: boolean;
+};
+
+export type CreateAdminUserInput = {
+  login: string;
+  password: string;
+  fullName: string;
+  role: UserRole;
+  active: boolean;
+  position?: string;
+  email?: string;
+  phone?: string;
+};
 
 export type PublishedQuestionnaire = {
   id: string;
@@ -56,6 +119,34 @@ export type PublishedQuestionnaireDetails = {
   title: string;
   version: number;
   source: unknown;
+};
+
+export type AdminQuestionnaireVersion = {
+  id: string;
+  questionnaireId: string;
+  version: number;
+  title: string;
+  active: boolean;
+  published: boolean;
+  importedBy: string;
+  importedAt: string;
+};
+
+export type AdminQuestionnaire = {
+  id: string;
+  title: string;
+  activeVersionId: string;
+  archived: boolean;
+  createdAt: string;
+  updatedAt: string;
+  versions: AdminQuestionnaireVersion[];
+};
+
+export type ImportQuestionnairesResult = {
+  questionnaireId: string;
+  versionId: string;
+  version: number;
+  title: string;
 };
 
 export type QuestionnaireRunStatus = "draft" | "finished";
@@ -116,12 +207,70 @@ export async function updateCurrentUserProfile(
   return result.user;
 }
 
-export async function loadPublishedQuestionnaires(token: string): Promise<PublishedQuestionnaire[]> {
-  const result = await apiRequest<{ questionnaires: PublishedQuestionnaire[] }>("/api/questionnaires", {
+export async function changeCurrentUserPassword(
+  token: string,
+  input: ChangePasswordInput,
+): Promise<void> {
+  await apiRequest<{ changed: boolean }>("/api/me/password", {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(input),
+  });
+}
+
+export async function loadUsersPage(
+  token: string,
+  params: ListPageParams = {},
+): Promise<PaginatedList<AdminUser>> {
+  const result = await apiRequest<{ users: AdminUser[]; pagination?: PaginationMeta }>(
+    `/api/users${buildListQuery(params)}`,
+    {
+      token,
+    },
+  );
+
+  return normalizePaginatedList(result.users, result.pagination);
+}
+
+export async function createAdminUser(
+  token: string,
+  input: CreateAdminUserInput,
+): Promise<AdminUser> {
+  const result = await apiRequest<{ user: AdminUser }>("/api/admin/users", {
+    method: "POST",
+    token,
+    body: JSON.stringify(input),
+  });
+
+  return result.user;
+}
+
+export async function updateUserAccess(
+  token: string,
+  userId: string,
+  input: UpdateUserAccessInput,
+): Promise<AdminUser> {
+  const result = await apiRequest<{ user: AdminUser }>(`/api/users/${encodeURIComponent(userId)}`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(input),
+  });
+
+  return result.user;
+}
+
+export async function loadPublishedQuestionnairesPage(
+  token: string,
+  params: ListPageParams = {},
+): Promise<PaginatedList<PublishedQuestionnaire>> {
+  const result = await apiRequest<{
+    questionnaires: PublishedQuestionnaire[];
+    pagination?: PaginationMeta;
+  }>(`/api/questionnaires${buildListQuery(params)}`, {
     token,
   });
 
-  return result.questionnaires;
+  return normalizePaginatedList(result.questionnaires, result.pagination);
 }
 
 export async function loadPublishedQuestionnaire(
@@ -138,6 +287,82 @@ export async function loadPublishedQuestionnaire(
   return result.questionnaire;
 }
 
+export async function loadAdminQuestionnairesPage(
+  token: string,
+  params: ListPageParams = {},
+): Promise<AdminQuestionnairesPageData> {
+  const result = await apiRequest<{
+    questionnaires: AdminQuestionnaire[];
+    pagination?: PaginationMeta;
+    summary?: AdminQuestionnairesSummary;
+  }>(`/api/admin/questionnaires${buildListQuery(params)}`, {
+    token,
+  });
+
+  const page = normalizePaginatedList(result.questionnaires, result.pagination);
+
+  return {
+    ...page,
+    summary: result.summary ?? {
+      totalQuestionnaires: page.pagination.totalItems,
+      totalVersions: result.questionnaires.reduce((sum, item) => sum + item.versions.length, 0),
+      activeQuestionnaires: result.questionnaires.filter((item) => !item.archived).length,
+    },
+  };
+}
+
+export async function importQuestionnairesToBackend(
+  token: string,
+  input: unknown,
+): Promise<ImportQuestionnairesResult[]> {
+  const result = await apiRequest<{ imported: ImportQuestionnairesResult[] }>("/api/admin/questionnaires/import", {
+    method: "POST",
+    token,
+    body: JSON.stringify(input),
+  });
+
+  return result.imported;
+}
+
+export async function publishAdminQuestionnaireVersion(
+  token: string,
+  questionnaireId: string,
+  versionId: string,
+): Promise<void> {
+  await apiRequest(
+    `/api/admin/questionnaires/${encodeURIComponent(questionnaireId)}/publish`,
+    {
+      method: "POST",
+      token,
+      body: JSON.stringify({ versionId }),
+    },
+  );
+}
+
+export async function deleteAdminQuestionnaireVersion(
+  token: string,
+  questionnaireId: string,
+  versionId: string,
+): Promise<void> {
+  await apiRequest(
+    `/api/admin/questionnaires/${encodeURIComponent(questionnaireId)}/versions/${encodeURIComponent(versionId)}`,
+    {
+      method: "DELETE",
+      token,
+    },
+  );
+}
+
+export async function deleteAdminQuestionnaire(
+  token: string,
+  questionnaireId: string,
+): Promise<void> {
+  await apiRequest(`/api/admin/questionnaires/${encodeURIComponent(questionnaireId)}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
 export async function createQuestionnaireRun(
   token: string,
   questionnaireId: string,
@@ -147,6 +372,40 @@ export async function createQuestionnaireRun(
     token,
     body: JSON.stringify({ questionnaireId }),
   });
+
+  return result.run;
+}
+
+export async function loadQuestionnaireRunsPage(
+  token: string,
+  params: ListPageParams = {},
+): Promise<QuestionnaireRunsPageData> {
+  const result = await apiRequest<{ runs: QuestionnaireRun[]; pagination?: PaginationMeta; summary?: QuestionnaireRunsSummary }>(
+    `/api/questionnaire-runs${buildListQuery(params)}`,
+    {
+      token,
+    },
+  );
+
+  const page = normalizePaginatedList(result.runs, result.pagination);
+
+  return {
+    ...page,
+    summary: result.summary ?? {
+      totalRuns: page.pagination.totalItems,
+      draftRuns: result.runs.filter((run) => run.status === "draft").length,
+      finishedRuns: result.runs.filter((run) => run.status === "finished").length,
+    },
+  };
+}
+
+export async function loadQuestionnaireRun(token: string, runId: string): Promise<QuestionnaireRun> {
+  const result = await apiRequest<{ run: QuestionnaireRun }>(
+    `/api/questionnaire-runs/${encodeURIComponent(runId)}`,
+    {
+      token,
+    },
+  );
 
   return result.run;
 }
@@ -177,6 +436,13 @@ export async function finishQuestionnaireRun(
   });
 
   return result.run;
+}
+
+export async function deleteQuestionnaireRunDraft(token: string, runId: string): Promise<void> {
+  await apiRequest(`/api/questionnaire-runs/${encodeURIComponent(runId)}`, {
+    method: "DELETE",
+    token,
+  });
 }
 
 async function apiRequest<TResponse>(
@@ -214,6 +480,47 @@ async function apiRequest<TResponse>(
   }
 
   return response.json() as Promise<TResponse>;
+}
+
+function buildListQuery(params: ListPageParams): string {
+  const query = new URLSearchParams();
+
+  if (params.page) {
+    query.set("page", String(params.page));
+  }
+
+  if (params.pageSize) {
+    query.set("pageSize", String(params.pageSize));
+  }
+
+  if (params.search?.trim()) {
+    query.set("search", params.search.trim());
+  }
+
+  if (params.role && params.role !== "all") {
+    query.set("role", params.role);
+  }
+
+  if (params.status && params.status !== "all") {
+    query.set("status", params.status);
+  }
+
+  const queryString = query.toString();
+
+  return queryString ? `?${queryString}` : "";
+}
+
+function normalizePaginatedList<T>(items: T[], pagination?: PaginationMeta): PaginatedList<T> {
+  return {
+    items,
+    pagination:
+      pagination ?? {
+        page: 1,
+        pageSize: Math.max(items.length, 1),
+        totalItems: items.length,
+        totalPages: 1,
+      },
+  };
 }
 
 async function readErrorBody(response: Response): Promise<ApiErrorBody> {

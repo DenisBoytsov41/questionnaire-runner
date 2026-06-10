@@ -5,7 +5,11 @@ import {
   questionnaireInputSchema,
   validateQuestionnaireContract,
 } from "./lib/questionnaireContract.js";
-import type { UserPreferences } from "./types.js";
+import {
+  convertTreePackageToQuestionnaireInput,
+  questionnaireTreePackageSchema,
+} from "./lib/questionnaireTreeFormat.js";
+import type { QuestionnaireRun, UserPreferences, UserRole } from "./types.js";
 import { signToken, toPublicUser, verifyPassword } from "./lib/crypto.js";
 import {
   createContext,
@@ -19,16 +23,22 @@ import {
 } from "./lib/http.js";
 import {
   checkDatabase,
+  changeUserPassword,
+  closeDatabase,
   createRun,
   createUser,
+  deleteQuestionnaire,
+  deleteQuestionnaireVersion,
+  deleteDraftRun,
   findUserByLogin,
   finishRun,
   getPublishedQuestionnaire,
   getRunForUser,
   importQuestionnaireVersions,
-  listPublishedQuestionnaires,
-  listRunsForUser,
-  listUsers,
+  listQuestionnairesForAdminPage,
+  listPublishedQuestionnairesPage,
+  listRunsForUserPage,
+  listUsersPage,
   publishQuestionnaireVersion,
   StorageConflictError,
   StorageForbiddenError,
@@ -42,10 +52,53 @@ import {
   sendSwaggerUi,
   sendSwaggerUnauthorized,
 } from "./lib/swagger.js";
-import { attachRequestLogger, logInfo } from "./lib/logger.js";
+import { attachRequestLogger, logError, logInfo, logWarn } from "./lib/logger.js";
 
 const port = Number(process.env.PORT ?? 4100);
 const jwtSecret = process.env.JWT_SECRET ?? "dev-secret-change-me";
+const maxAvatarImagePayloadLength = 14_500_000;
+
+function readPaginationQuery(url: URL) {
+  return {
+    page: readPositiveIntegerParam(url, "page"),
+    pageSize: readPositiveIntegerParam(url, "pageSize"),
+    search: url.searchParams.get("search") ?? "",
+  };
+}
+
+function readUserListQuery(url: URL) {
+  const role = url.searchParams.get("role");
+  const normalizedRole: UserRole | "all" =
+    role === "user" || role === "operator" || role === "admin" ? role : "all";
+
+  return {
+    ...readPaginationQuery(url),
+    role: normalizedRole,
+  };
+}
+
+function readRunListQuery(url: URL) {
+  const status = url.searchParams.get("status");
+  const normalizedStatus: QuestionnaireRun["status"] | "all" =
+    status === "draft" || status === "finished" ? status : "all";
+
+  return {
+    ...readPaginationQuery(url),
+    status: normalizedStatus,
+  };
+}
+
+function readPositiveIntegerParam(url: URL, name: string): number | undefined {
+  const value = url.searchParams.get(name);
+
+  if (!value) {
+    return undefined;
+  }
+
+  const parsed = Number(value);
+
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : undefined;
+}
 
 const registerSchema = z.object({
   login: z.string().trim().min(3),
@@ -53,9 +106,25 @@ const registerSchema = z.object({
   fullName: z.string().trim().min(2),
 });
 
+const createAdminUserSchema = z.object({
+  login: z.string().trim().min(3),
+  password: z.string().min(6),
+  fullName: z.string().trim().min(2),
+  email: z.string().trim().email().or(z.literal("")).optional(),
+  phone: z.string().trim().max(50).optional(),
+  position: z.string().trim().max(120).optional(),
+  role: z.enum(["user", "operator", "admin"]).default("operator"),
+  active: z.boolean().default(true),
+});
+
 const loginSchema = z.object({
   login: z.string().trim().min(1),
   password: z.string().min(1),
+});
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8).max(128),
 });
 
 const updateUserRoleSchema = z.object({
@@ -69,7 +138,7 @@ const userPreferencesSchema = z.object({
   readingMode: z.enum(["normal", "high-contrast"]).default("normal"),
   profileIcon: z.enum(["person", "headset", "shield", "star", "check"]).default("person"),
   profileColor: z.enum(["teal", "mint", "blue", "amber", "rose"]).default("teal"),
-  avatarImage: z.string().max(900_000).default(""),
+  avatarImage: z.string().max(maxAvatarImagePayloadLength).default(""),
 });
 
 const updateProfileSchema = z.object({
@@ -187,15 +256,42 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === "PATCH" && parts[1] === "me" && parts[2] === "password") {
+      const currentUser = requireUser(context);
+      const body = changePasswordSchema.parse(await readJsonBody(req));
+      await changeUserPassword({
+        userId: currentUser.id,
+        currentPassword: body.currentPassword,
+        newPassword: body.newPassword,
+      });
+
+      sendJson(res, 200, { changed: true });
+      return;
+    }
+
     if (req.method === "GET" && parts[1] === "users") {
       requireRole(context, ["admin"]);
-      sendJson(res, 200, { users: await listUsers() });
+      const page = await listUsersPage(readUserListQuery(context.url));
+      sendJson(res, 200, { users: page.items, pagination: page.pagination });
+      return;
+    }
+
+    if (req.method === "POST" && parts[1] === "admin" && parts[2] === "users") {
+      requireRole(context, ["admin"]);
+      const body = createAdminUserSchema.parse(await readJsonBody(req));
+      const user = await createUser(body);
+      sendJson(res, 201, { user });
       return;
     }
 
     if (req.method === "PATCH" && parts[1] === "users" && parts[2]) {
-      requireRole(context, ["admin"]);
+      const admin = requireRole(context, ["admin"]);
       const body = updateUserRoleSchema.parse(await readJsonBody(req));
+
+      if (parts[2] === admin.id && body.role !== admin.role) {
+        throw new HttpError(409, "Нельзя менять роль своей учётной записи.");
+      }
+
       const user = await updateUserAdmin({
         userId: parts[2],
         role: body.role,
@@ -212,7 +308,8 @@ const server = createServer(async (req, res) => {
 
     if (req.method === "GET" && parts[1] === "questionnaires" && !parts[2]) {
       requireRole(context, ["operator", "admin"]);
-      sendJson(res, 200, { questionnaires: await listPublishedQuestionnaires() });
+      const page = await listPublishedQuestionnairesPage(readPaginationQuery(context.url));
+      sendJson(res, 200, { questionnaires: page.items, pagination: page.pagination });
       return;
     }
 
@@ -236,6 +333,13 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === "GET" && parts[1] === "admin" && parts[2] === "questionnaires" && !parts[3]) {
+      requireRole(context, ["admin"]);
+      const page = await listQuestionnairesForAdminPage(readPaginationQuery(context.url));
+      sendJson(res, 200, { questionnaires: page.items, pagination: page.pagination, summary: page.summary });
+      return;
+    }
+
     if (
       req.method === "POST"
       && parts[1] === "admin"
@@ -256,6 +360,50 @@ const server = createServer(async (req, res) => {
       }
 
       sendJson(res, 200, result);
+      return;
+    }
+
+    if (
+      req.method === "DELETE"
+      && parts[1] === "admin"
+      && parts[2] === "questionnaires"
+      && parts[3]
+      && parts[4] === "versions"
+      && parts[5]
+    ) {
+      const admin = requireRole(context, ["admin"]);
+      const deleted = await deleteQuestionnaireVersion({
+        questionnaireId: parts[3],
+        versionId: parts[5],
+        adminId: admin.id,
+      });
+
+      if (!deleted) {
+        throw new HttpError(404, "Сценарий или версия не найдены.");
+      }
+
+      sendJson(res, 200, { deleted: true });
+      return;
+    }
+
+    if (
+      req.method === "DELETE"
+      && parts[1] === "admin"
+      && parts[2] === "questionnaires"
+      && parts[3]
+      && !parts[4]
+    ) {
+      const admin = requireRole(context, ["admin"]);
+      const deleted = await deleteQuestionnaire({
+        questionnaireId: parts[3],
+        adminId: admin.id,
+      });
+
+      if (!deleted) {
+        throw new HttpError(404, "Сценарий не найден.");
+      }
+
+      sendJson(res, 200, { deleted: true });
       return;
     }
 
@@ -310,7 +458,24 @@ const server = createServer(async (req, res) => {
 
     if (req.method === "GET" && parts[1] === "questionnaire-runs" && !parts[2]) {
       const user = requireRole(context, ["operator", "admin"]);
-      sendJson(res, 200, { runs: await listRunsForUser(user.id, user.role) });
+      const page = await listRunsForUserPage(user.id, user.role, readRunListQuery(context.url));
+      sendJson(res, 200, { runs: page.items, pagination: page.pagination, summary: page.summary });
+      return;
+    }
+
+    if (req.method === "DELETE" && parts[1] === "questionnaire-runs" && parts[2]) {
+      const user = requireRole(context, ["operator", "admin"]);
+      const deleted = await deleteDraftRun({
+        runId: parts[2],
+        userId: user.id,
+        role: user.role,
+      });
+
+      if (!deleted) {
+        throw new HttpError(404, "Прохождение не найдено.");
+      }
+
+      sendJson(res, 200, { deleted: true });
       return;
     }
 
@@ -331,7 +496,7 @@ const server = createServer(async (req, res) => {
     if (error instanceof z.ZodError) {
       sendJson(res, 400, {
         error: "Данные запроса не прошли проверку.",
-        details: error.issues.map((issue) => `${issue.path.join(".") || "root"}: ${issue.message}`),
+        details: formatSchemaIssues(error.issues),
       });
       return;
     }
@@ -356,6 +521,44 @@ server.listen(port, () => {
   logInfo("server", "Логин и пароль администратора можно задать через ADMIN_LOGIN и ADMIN_PASSWORD");
 });
 
+let isShuttingDown = false;
+
+function shutdown(signal: NodeJS.Signals): void {
+  if (isShuttingDown) {
+    return;
+  }
+
+  isShuttingDown = true;
+  logInfo("server", "Получен сигнал остановки, закрываем backend", { signal });
+
+  const forceExitTimer = setTimeout(() => {
+    logWarn("server", "Backend не успел завершиться штатно, завершаем принудительно", { signal });
+    process.exit(1);
+  }, 10_000);
+  forceExitTimer.unref();
+
+  server.close((error) => {
+    if (error) {
+      logError("server", "Ошибка при остановке HTTP-сервера", { message: error.message });
+    }
+
+    closeDatabase()
+      .then(() => {
+        clearTimeout(forceExitTimer);
+        logInfo("server", "Backend остановлен штатно", { signal });
+        process.exit(error ? 1 : 0);
+      })
+      .catch((databaseError: Error) => {
+        clearTimeout(forceExitTimer);
+        logError("database", "Ошибка при закрытии соединений PostgreSQL", { message: databaseError.message });
+        process.exit(1);
+      });
+  });
+}
+
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);
+
 async function login(loginValue: string, password: string) {
   const user = await findUserByLogin(loginValue);
 
@@ -372,10 +575,10 @@ async function login(loginValue: string, password: string) {
 }
 
 async function importQuestionnaires(input: unknown, importedBy: string) {
-  const parsed = questionnaireInputSchema.safeParse(input);
+  const parsed = parseSupportedQuestionnaireInput(input);
 
   if (!parsed.success) {
-    throw new HttpError(400, parsed.error.issues.map((issue) => issue.message).join("; "));
+    throw new HttpError(400, parsed.errors.join(" "));
   }
 
   const questionnaires = isQuestionnaireBundle(parsed.data) ? parsed.data.questionnaires : [parsed.data];
@@ -388,4 +591,138 @@ async function importQuestionnaires(input: unknown, importedBy: string) {
   return {
     imported: await importQuestionnaireVersions({ questionnaires, importedBy }),
   };
+}
+
+function parseSupportedQuestionnaireInput(input: unknown) {
+  if (!isJsonObject(input)) {
+    return {
+      success: false as const,
+      errors: ["В корне JSON должен находиться объект с описанием одного или нескольких сценариев."],
+    };
+  }
+
+  if (input.format === "kservice_questionnaire_tree") {
+    const treeParsed = questionnaireTreePackageSchema.safeParse(input);
+
+    if (!treeParsed.success) {
+      return {
+        success: false as const,
+        errors: formatSchemaIssues(treeParsed.error.issues),
+      };
+    }
+
+    const converted = questionnaireInputSchema.safeParse(
+      convertTreePackageToQuestionnaireInput(treeParsed.data),
+    );
+
+    if (!converted.success) {
+      return {
+        success: false as const,
+        errors: formatSchemaIssues(converted.error.issues),
+      };
+    }
+
+    return {
+      success: true as const,
+      data: converted.data,
+    };
+  }
+
+  if (typeof input.schema === "string") {
+    const legacyParsed = questionnaireInputSchema.safeParse(input);
+
+    if (legacyParsed.success) {
+      return {
+        success: true as const,
+        data: legacyParsed.data,
+      };
+    }
+
+    return {
+      success: false as const,
+      errors: formatSchemaIssues(legacyParsed.error.issues),
+    };
+  }
+
+  return {
+    success: false as const,
+    errors: [
+      "Не удалось распознать формат выгрузки.",
+      'Для новой структуры требуется "format": "kservice_questionnaire_tree", "version": 1 и массив "questionnaires".',
+      'Для прежней структуры требуется поле "schema".',
+    ],
+  };
+}
+
+function formatSchemaIssues(
+  issues: ReadonlyArray<{
+    code: string;
+    path: PropertyKey[];
+    message: string;
+    expected?: string;
+    values?: unknown[];
+  }>,
+): string[] {
+  return issues.slice(0, 10).map((issue) => {
+    const path = formatIssuePath(issue.path);
+    const location = path ? `Поле «${path}»` : "Структура JSON";
+
+    if (issue.code === "invalid_type") {
+      return `${location} отсутствует или имеет неверный тип${formatExpectedType(issue.expected)}.`;
+    }
+
+    if (issue.code === "invalid_value" && issue.values?.length) {
+      return `${location} содержит недопустимое значение. Допустимо: ${issue.values
+        .map((value) => JSON.stringify(value))
+        .join(", ")}.`;
+    }
+
+    if (issue.code === "too_small") {
+      return `${location} не должно быть пустым.`;
+    }
+
+    if (issue.code === "invalid_union") {
+      return `${location} не соответствует поддерживаемой структуре сценария.`;
+    }
+
+    return `${location}: ${translateValidationMessage(issue.message)}.`;
+  });
+}
+
+function formatIssuePath(path: PropertyKey[]): string {
+  return path.reduce<string>((result, part) => {
+    if (typeof part === "number") {
+      return `${result}[${part + 1}]`;
+    }
+
+    return result ? `${result}.${String(part)}` : String(part);
+  }, "");
+}
+
+function formatExpectedType(expected: string | undefined): string {
+  const labels: Record<string, string> = {
+    array: "массив",
+    boolean: "логическое значение",
+    number: "число",
+    object: "объект",
+    string: "строка",
+  };
+
+  return expected ? ` (ожидается ${labels[expected] ?? expected})` : "";
+}
+
+function translateValidationMessage(message: string): string {
+  if (message === "Invalid input") {
+    return "указано некорректное значение";
+  }
+
+  if (message.startsWith("Invalid input: expected ")) {
+    return "значение имеет неверный тип";
+  }
+
+  return message.replace(/\.$/, "");
+}
+
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

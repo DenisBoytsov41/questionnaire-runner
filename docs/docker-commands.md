@@ -30,9 +30,9 @@ pgAdmin:  http://localhost:5050
 Доступы по умолчанию:
 
 ```text
-Администратор: admin / admin123
-Документация API: docs / docs-password
-pgAdmin: admin@k-service44.ru / admin123
+Администратор: admin / значение ADMIN_PASSWORD из .env
+Документация API: docs / значение SWAGGER_PASSWORD из .env
+pgAdmin: admin@k-service44.ru / значение PGADMIN_DEFAULT_PASSWORD из .env
 ```
 
 ## Запуск в фоне
@@ -107,7 +107,7 @@ http://localhost:5050
 
 ```text
 Email: admin@k-service44.ru
-Пароль: admin123
+Пароль: значение PGADMIN_DEFAULT_PASSWORD из .env
 ```
 
 Если пароль переопределён в `.env`, используйте значение `PGADMIN_DEFAULT_PASSWORD`.
@@ -394,7 +394,7 @@ ADMIN_LOGIN=admin
 ADMIN_PASSWORD=strong-password
 
 SWAGGER_USER=docs
-SWAGGER_PASSWORD=strong-docs-password
+SWAGGER_PASSWORD=strong-api-docs-secret
 
 POSTGRES_DB=questionnaire_runner
 POSTGRES_USER=questionnaire

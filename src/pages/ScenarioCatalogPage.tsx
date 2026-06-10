@@ -1,13 +1,19 @@
-import type { CurrentUser, PublishedQuestionnaire, UserPreferences } from "../shared/api/backendApi";
-import { BrandHeader, type SettingsStatus } from "../shared/ui/BrandHeader";
+import type { CurrentUser, PaginationMeta, PublishedQuestionnaire, UserPreferences } from "../shared/api/backendApi";
+import { BrandHeader, type HeaderNavigationItem, type SettingsStatus } from "../shared/ui/BrandHeader";
+import { Pagination } from "../shared/ui/Pagination";
 
 interface ScenarioCatalogPageProps {
   questionnaires: PublishedQuestionnaire[];
+  pagination: PaginationMeta;
   status: "loading" | "ready" | "error";
   error: string;
   onSelectQuestionnaire: (questionnaire: PublishedQuestionnaire) => void;
   onRefresh: () => void;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
   onOpenManualUpload: () => void;
+  onOpenAdminQuestionnaires?: () => void;
+  navigationItems?: HeaderNavigationItem[];
   user: CurrentUser;
   settings: UserPreferences;
   settingsStatus: SettingsStatus;
@@ -18,11 +24,16 @@ interface ScenarioCatalogPageProps {
 
 export function ScenarioCatalogPage({
   questionnaires,
+  pagination,
   status,
   error,
   onSelectQuestionnaire,
   onRefresh,
+  onPageChange,
+  onPageSizeChange,
   onOpenManualUpload,
+  onOpenAdminQuestionnaires,
+  navigationItems,
   user,
   settings,
   settingsStatus,
@@ -37,9 +48,10 @@ export function ScenarioCatalogPage({
       <BrandHeader
         subtitle="Рабочее место оператора"
         action={{
-          label: "Загрузить файл вручную",
-          onClick: onOpenManualUpload,
+          label: user.role === "admin" && onOpenAdminQuestionnaires ? "Сценарии в базе" : "Загрузить файл вручную",
+          onClick: user.role === "admin" && onOpenAdminQuestionnaires ? onOpenAdminQuestionnaires : onOpenManualUpload,
         }}
+        navigationItems={navigationItems}
         user={user}
         settings={settings}
         settingsStatus={settingsStatus}
@@ -54,14 +66,16 @@ export function ScenarioCatalogPage({
             <p className="page-kicker">Сценарии из базы</p>
             <h1>Выберите рабочий сценарий</h1>
             <p>
-              Здесь показаны опубликованные опросники из backend. Оператор запускает сценарий отсюда,
-              а ручная загрузка файла остаётся запасным вариантом.
+              Здесь показаны опубликованные опросники из базы. Оператор запускает сценарий отсюда,
+              а ручная загрузка файла остаётся запасным вариантом для проверки.
             </p>
           </div>
 
-          <button type="button" className="secondary-button" onClick={onRefresh} disabled={isLoading}>
-            {isLoading ? "Обновляем..." : "Обновить список"}
-          </button>
+          <div className="scenario-catalog-actions">
+            <button type="button" className="secondary-button" onClick={onRefresh} disabled={isLoading}>
+              {isLoading ? "Обновляем..." : "Обновить список"}
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -74,7 +88,7 @@ export function ScenarioCatalogPage({
           <div className="scenario-empty-card">
             <p className="page-kicker">Загрузка</p>
             <h2>Получаем сценарии</h2>
-            <p>Проверяем опубликованные опросники и подготовим список для запуска.</p>
+            <p>Проверяем опубликованные опросники и готовим список для запуска.</p>
           </div>
         )}
 
@@ -83,14 +97,20 @@ export function ScenarioCatalogPage({
             <p className="page-kicker">Сценариев пока нет</p>
             <h2>В базе нет опубликованных опросников</h2>
             <p>
-              Администратор может загрузить JSON из 1С в backend и опубликовать версию. Если нужно
-              проверить сценарий прямо сейчас, используйте ручную загрузку файла.
+              Администратор может загрузить JSON из 1С в серверную часть и опубликовать версию.
+              Если нужно проверить сценарий прямо сейчас, используйте ручную загрузку файла.
             </p>
 
             <div className="scenario-empty-actions">
-              <button type="button" className="primary-button" onClick={onOpenManualUpload}>
-                Загрузить файл вручную
-              </button>
+              {user.role === "admin" && onOpenAdminQuestionnaires ? (
+                <button type="button" className="primary-button" onClick={onOpenAdminQuestionnaires}>
+                  Загрузить сценарий в базу
+                </button>
+              ) : (
+                <button type="button" className="primary-button" onClick={onOpenManualUpload}>
+                  Загрузить файл вручную
+                </button>
+              )}
               <button type="button" className="secondary-button" onClick={onRefresh}>
                 Проверить ещё раз
               </button>
@@ -99,7 +119,8 @@ export function ScenarioCatalogPage({
         )}
 
         {questionnaires.length > 0 && (
-          <div className="questionnaire-grid">
+          <>
+          <div className="questionnaire-grid scenario-catalog-grid">
             {questionnaires.map((questionnaire) => (
               <article key={questionnaire.id} className="questionnaire-card scenario-card">
                 <div className="questionnaire-card-header">
@@ -127,6 +148,16 @@ export function ScenarioCatalogPage({
               </article>
             ))}
           </div>
+          <Pagination
+            label="сценариев"
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            totalItems={pagination.totalItems}
+            totalPages={pagination.totalPages}
+            onPageChange={onPageChange}
+            onPageSizeChange={onPageSizeChange}
+          />
+          </>
         )}
       </section>
     </main>

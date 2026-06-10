@@ -29,9 +29,9 @@ services:
       CORS_ORIGIN: "${CORS_ORIGIN:-http://localhost:5173}"
       JWT_SECRET: "${JWT_SECRET:-change-me-use-long-random-value}"
       ADMIN_LOGIN: "${ADMIN_LOGIN:-admin}"
-      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-admin123}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-KService-Admin-2026!}"
       SWAGGER_USER: "${SWAGGER_USER:-docs}"
-      SWAGGER_PASSWORD: "${SWAGGER_PASSWORD:-docs-password}"
+      SWAGGER_PASSWORD: "${SWAGGER_PASSWORD:-KService-Docs-2026!}"
       DATABASE_URL: "postgresql://${POSTGRES_USER:-questionnaire}:${POSTGRES_PASSWORD:-questionnaire_password}@db:5432/${POSTGRES_DB:-questionnaire_runner}"
     depends_on:
       db:
@@ -69,7 +69,7 @@ services:
       - "${PGADMIN_PORT:-5050}:80"
     environment:
       PGADMIN_DEFAULT_EMAIL: "${PGADMIN_DEFAULT_EMAIL:-admin@k-service44.ru}"
-      PGADMIN_DEFAULT_PASSWORD: "${PGADMIN_DEFAULT_PASSWORD:-admin123}"
+      PGADMIN_DEFAULT_PASSWORD: "${PGADMIN_DEFAULT_PASSWORD:-KService-PgAdmin-2026!}"
       PGADMIN_REPLACE_SERVERS_ON_STARTUP: "True"
     volumes:
       - questionnaire-pgadmin-data:/var/lib/pgadmin

@@ -3,12 +3,20 @@ import { defaultUserPreferences, type CurrentUser, type UserPreferences } from "
 
 export type SettingsStatus = "idle" | "saving" | "saved" | "error";
 
+export type HeaderNavigationItem = {
+  label: string;
+  description?: string;
+  active?: boolean;
+  onClick: () => void;
+};
+
 interface BrandHeaderProps {
   subtitle: string;
   action?: {
     label: string;
     onClick: () => void;
   };
+  navigationItems?: HeaderNavigationItem[];
   user?: CurrentUser;
   settings: UserPreferences;
   settingsStatus?: SettingsStatus;
@@ -36,6 +44,7 @@ const readingOptions: Array<{ value: UserPreferences["readingMode"]; label: stri
 export function BrandHeader({
   subtitle,
   action,
+  navigationItems = [],
   user,
   settings,
   settingsStatus = "idle",
@@ -44,9 +53,12 @@ export function BrandHeader({
   onLogout,
 }: BrandHeaderProps) {
   const [isViewMenuOpen, setIsViewMenuOpen] = useState(false);
+  const [isNavigationOpen, setIsNavigationOpen] = useState(false);
   const viewMenuRef = useRef<HTMLDivElement | null>(null);
+  const navigationRef = useRef<HTMLDivElement | null>(null);
   const activeTextSize = textSizeOptions.find((option) => option.value === settings.textSize);
   const activeTheme = themeOptions.find((option) => option.value === settings.theme);
+  const activeNavigationItem = navigationItems.find((item) => item.active);
 
   useEffect(() => {
     if (!isViewMenuOpen) {
@@ -77,6 +89,36 @@ export function BrandHeader({
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [isViewMenuOpen]);
+
+  useEffect(() => {
+    if (!isNavigationOpen) {
+      return;
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as Node | null;
+
+      if (target && navigationRef.current?.contains(target)) {
+        return;
+      }
+
+      setIsNavigationOpen(false);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsNavigationOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isNavigationOpen]);
 
   const updateSettings = (nextSettings: Partial<UserPreferences>) => {
     onSettingsChange({ ...settings, ...nextSettings });
@@ -111,6 +153,40 @@ export function BrandHeader({
       </div>
 
       <div className="top-bar-actions">
+        {navigationItems.length > 0 && (
+          <div className="workspace-navigation" ref={navigationRef}>
+            <button
+              type="button"
+              className="workspace-navigation-toggle"
+              aria-expanded={isNavigationOpen}
+              onClick={() => setIsNavigationOpen((isOpen) => !isOpen)}
+            >
+              <span>Разделы</span>
+              <small>{activeNavigationItem?.label ?? "Выберите раздел"}</small>
+            </button>
+
+            {isNavigationOpen && (
+              <div className="workspace-navigation-menu" aria-label="Разделы рабочего места">
+                {navigationItems.map((item) => (
+                  <button
+                    key={item.label}
+                    type="button"
+                    className={`workspace-navigation-item${item.active ? " active" : ""}`}
+                    aria-current={item.active ? "page" : undefined}
+                    onClick={() => {
+                      item.onClick();
+                      setIsNavigationOpen(false);
+                    }}
+                  >
+                    <strong>{item.label}</strong>
+                    {item.description && <span>{item.description}</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {action && (
           <button type="button" className="secondary-button top-file-button" onClick={action.onClick}>
             {action.label}

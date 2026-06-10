@@ -18,6 +18,8 @@ interface QuestionnaireMapProps {
   draftSavedAt: string;
   serverSaveStatus?: "idle" | "saving" | "saved" | "error";
   serverSavedAt?: string;
+  serverSaveInProgress?: boolean;
+  canGoBack: boolean;
   onBack: () => void;
   onClearDraft: () => void;
   onNavigateToQuestion: (questionId: string) => void;
@@ -33,6 +35,8 @@ export function QuestionnaireMap({
   draftSavedAt,
   serverSaveStatus,
   serverSavedAt,
+  serverSaveInProgress,
+  canGoBack,
   onBack,
   onClearDraft,
   onNavigateToQuestion,
@@ -58,7 +62,10 @@ export function QuestionnaireMap({
     [groupedQuestions, questionSearch],
   );
   const currentQuestion = questionnaire.questions.find((question) => question.id === currentQuestionId);
-  const currentStep = Math.min(completedRoute.length + 1, totalQuestions);
+  const currentRouteIndex = completedRoute.indexOf(currentQuestionId);
+  const currentStep = currentRouteIndex >= 0
+    ? currentRouteIndex + 1
+    : Math.min(completedRoute.length + 1, totalQuestions);
   const progressValue = totalQuestions > 0 ? Math.round((currentStep / totalQuestions) * 100) : 0;
 
   return (
@@ -81,7 +88,7 @@ export function QuestionnaireMap({
         <button
           type="button"
           className="secondary-button route-back-button"
-          disabled={completedRoute.length === 0}
+          disabled={!canGoBack}
           onClick={onBack}
         >
           Назад к предыдущему вопросу
@@ -119,8 +126,20 @@ export function QuestionnaireMap({
         </button>
 
         {serverSaveStatus && (
-          <p className={`server-save-status ${serverSaveStatus}`}>
-            {formatServerSaveStatus(serverSaveStatus, serverSavedAt)}
+          <p
+            className={`server-save-status ${serverSaveStatus}${serverSaveInProgress ? " is-saving" : ""}`}
+            aria-live="polite"
+          >
+            {serverSavedAt && serverSaveStatus !== "error" ? (
+              <>
+                <span>Сохранено в базе:</span>{" "}
+                <time key={serverSavedAt} className="server-save-time" dateTime={serverSavedAt}>
+                  {formatTime(serverSavedAt)}
+                </time>
+              </>
+            ) : (
+              formatServerSaveStatus(serverSaveStatus)
+            )}
           </p>
         )}
       </section>
@@ -237,14 +256,13 @@ export function QuestionnaireMap({
 
 function formatServerSaveStatus(
   status: NonNullable<QuestionnaireMapProps["serverSaveStatus"]>,
-  savedAt: string | undefined,
 ): string {
   if (status === "saving") {
     return "Сохраняем в базе...";
   }
 
   if (status === "saved") {
-    return savedAt ? `Сохранено в базе: ${formatTime(savedAt)}` : "Сохранено в базе.";
+    return "Сохранено в базе.";
   }
 
   if (status === "error") {

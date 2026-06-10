@@ -12,6 +12,7 @@ import type {
 import {
   finishQuestionnaireRun,
   saveQuestionnaireRunDraft,
+  type QuestionnaireRun,
   type QuestionnaireRunPayload,
 } from "../../../shared/api/backendApi";
 import {
@@ -23,6 +24,7 @@ import {
 } from "../lib/draftStorage";
 import {
   createInitialRunnerState,
+  createRunnerStateFromSnapshot,
   runnerReducer,
 } from "../model/reducer";
 import { QuestionCard } from "./QuestionCard";
@@ -37,23 +39,42 @@ interface QuestionnaireRunnerProps {
 export interface QuestionnaireRunPersistence {
   token: string;
   runId: string;
+  initialRun?: QuestionnaireRun;
 }
 
 type ServerSaveStatus = "idle" | "saving" | "saved" | "error";
 
 export function QuestionnaireRunner({ questionnaire, backendRun }: QuestionnaireRunnerProps) {
-  const [restoredDraftSavedAt] = useState(() => getRunnerDraftSavedAt(questionnaire));
+  const [restoredDraftSavedAt] = useState(() =>
+    backendRun?.initialRun?.updatedAt ?? getRunnerDraftSavedAt(questionnaire),
+  );
   const [lastSavedAt, setLastSavedAt] = useState(restoredDraftSavedAt);
-  const [serverSavedAt, setServerSavedAt] = useState("");
-  const [serverSaveStatus, setServerSaveStatus] = useState<ServerSaveStatus>("idle");
+  const [serverSavedAt, setServerSavedAt] = useState(backendRun?.initialRun?.updatedAt ?? "");
+  const [serverSaveStatus, setServerSaveStatus] = useState<ServerSaveStatus>(
+    backendRun?.initialRun?.updatedAt ? "saved" : "idle",
+  );
+  const [serverSaveInProgress, setServerSaveInProgress] = useState(false);
   const finishedRunIdsRef = useRef(new Set<string>());
+  const latestSaveRequestRef = useRef(0);
+  const serverSavedAtRef = useRef(backendRun?.initialRun?.updatedAt ?? "");
   const backendRunId = backendRun?.runId;
   const backendToken = backendRun?.token;
   const [state, dispatch] = useReducer(
     runnerReducer,
     questionnaire,
     (initialQuestionnaire) => (
-      createRunnerStateFromDraft(initialQuestionnaire) ?? createInitialRunnerState(initialQuestionnaire)
+      backendRun?.initialRun
+        ? createRunnerStateFromSnapshot(initialQuestionnaire, {
+            currentQuestionId: backendRun.initialRun.currentQuestionId,
+            answers: backendRun.initialRun.answers,
+            history: backendRun.initialRun.route,
+            messages: backendRun.initialRun.messages,
+            verdicts: backendRun.initialRun.verdicts,
+            startedAt: backendRun.initialRun.startedAt,
+            finishedAt: backendRun.initialRun.finishedAt,
+            isFinished: backendRun.initialRun.status === "finished",
+          }) ?? createInitialRunnerState(initialQuestionnaire)
+        : createRunnerStateFromDraft(initialQuestionnaire) ?? createInitialRunnerState(initialQuestionnaire)
     ),
   );
 
@@ -66,6 +87,11 @@ export function QuestionnaireRunner({ questionnaire, backendRun }: Questionnaire
     ? mainQuestions.findIndex((question) => question.id === state.currentQuestion?.id) + 1
     : mainQuestions.length;
   const isBranchQuestion = currentQuestionNumber <= 0;
+  const currentRouteIndex = state.currentQuestion
+    ? state.history.indexOf(state.currentQuestion.id)
+    : -1;
+  const canGoBack = currentRouteIndex > 0 || (currentRouteIndex < 0 && state.history.length > 0);
+  const answeredRouteCount = countAnsweredRouteQuestions(state);
 
   useEffect(() => {
     let timeoutId = 0;
@@ -91,10 +117,14 @@ export function QuestionnaireRunner({ questionnaire, backendRun }: Questionnaire
       return;
     }
 
+    const requestId = latestSaveRequestRef.current + 1;
+
+    latestSaveRequestRef.current = requestId;
     const timeoutId = window.setTimeout(() => {
       const payload = buildRunPayload(state);
 
-      setServerSaveStatus("saving");
+      setServerSaveInProgress(true);
+      setServerSaveStatus((current) => (serverSavedAtRef.current ? current : "saving"));
 
       const request = state.isFinished
         ? finishQuestionnaireRun(backendToken, backendRunId, payload)
@@ -102,15 +132,26 @@ export function QuestionnaireRunner({ questionnaire, backendRun }: Questionnaire
 
       request
         .then((run) => {
+          if (requestId !== latestSaveRequestRef.current) {
+            return;
+          }
+
           if (state.isFinished) {
             finishedRunIdsRef.current.add(backendRunId);
           }
 
+          serverSavedAtRef.current = run.updatedAt;
           setServerSavedAt(run.updatedAt);
           setServerSaveStatus("saved");
+          setServerSaveInProgress(false);
         })
         .catch(() => {
+          if (requestId !== latestSaveRequestRef.current) {
+            return;
+          }
+
           setServerSaveStatus("error");
+          setServerSaveInProgress(false);
         });
     }, state.isFinished ? 0 : 700);
 
@@ -173,7 +214,7 @@ export function QuestionnaireRunner({ questionnaire, backendRun }: Questionnaire
           isBranchQuestion={isBranchQuestion}
           initialAnswer={state.answers[state.currentQuestion.id]}
           validationError={state.validationError}
-          canGoBack={state.history.length > 0}
+          canGoBack={canGoBack}
           onAnswer={handleAnswer}
           onBack={() => dispatch({ type: "BACK" })}
           onFinish={() => dispatch({ type: "FINISH" })}
@@ -186,11 +227,13 @@ export function QuestionnaireRunner({ questionnaire, backendRun }: Questionnaire
           currentQuestionId={state.currentQuestion.id}
           completedRoute={state.history}
           totalQuestions={mainQuestions.length}
-          answeredCount={Object.keys(state.answers).length}
+          answeredCount={answeredRouteCount}
           startedAt={state.startedAt}
           draftSavedAt={lastSavedAt}
           serverSaveStatus={backendRun ? serverSaveStatus : undefined}
           serverSavedAt={serverSavedAt}
+          serverSaveInProgress={serverSaveInProgress}
+          canGoBack={canGoBack}
           onBack={() => dispatch({ type: "BACK" })}
           onClearDraft={handleRestart}
           onNavigateToQuestion={(questionId) => {
@@ -210,12 +253,32 @@ export function QuestionnaireRunner({ questionnaire, backendRun }: Questionnaire
 function buildRunPayload(state: ReturnType<typeof createInitialRunnerState>): QuestionnaireRunPayload {
   return {
     currentQuestionId: state.currentQuestion?.id ?? null,
-    answers: state.answers,
+    answers: filterAnswersByRoute(state),
     route: state.history,
     messages: state.messages.map((message) => message.text),
     verdicts: state.verdicts.map((verdict) => verdict.text),
     summaryText: buildSummaryTextForBackend(state),
   };
+}
+
+function filterAnswersByRoute(
+  state: ReturnType<typeof createInitialRunnerState>,
+): QuestionnaireRunPayload["answers"] {
+  return state.history.reduce<QuestionnaireRunPayload["answers"]>((result, questionId) => {
+    if (Object.prototype.hasOwnProperty.call(state.answers, questionId)) {
+      result[questionId] = state.answers[questionId];
+    }
+
+    return result;
+  }, {});
+}
+
+function countAnsweredRouteQuestions(state: ReturnType<typeof createInitialRunnerState>): number {
+  return new Set(
+    state.history.filter((questionId) =>
+      Object.prototype.hasOwnProperty.call(state.answers, questionId),
+    ),
+  ).size;
 }
 
 function buildSummaryTextForBackend(state: ReturnType<typeof createInitialRunnerState>): string {
