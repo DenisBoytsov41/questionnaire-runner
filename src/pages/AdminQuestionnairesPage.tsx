@@ -145,7 +145,7 @@ export function AdminQuestionnairesPage({
 
   async function deleteQuestionnaire(questionnaire: AdminQuestionnaire) {
     const confirmed = window.confirm(
-      `Удалить сценарий «${questionnaire.title}» и все его версии?\n\nСценарий нельзя будет восстановить.`,
+      `Удалить сценарий «${questionnaire.title}»?\n\nОн исчезнет из списка и рабочего места операторов. Сохранённые прохождения останутся в истории.`,
     );
 
     if (!confirmed) {

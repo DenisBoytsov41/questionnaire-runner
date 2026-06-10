@@ -514,12 +514,11 @@ const openApiDocument = {
       delete: {
         tags: ["Опросники"],
         security: [{ bearerAuth: [] }],
-        summary: "Удалить сценарий вместе с версиями, если по нему нет прохождений",
+        summary: "Удалить сценарий; связанные прохождения сохраняются в истории",
         parameters: [pathParameter("id", "Идентификатор сценария")],
         responses: {
           200: response("Сценарий удалён", { deleted: { type: "boolean" } }),
           404: errorResponse("Сценарий не найден"),
-          409: errorResponse("По сценарию уже есть прохождения"),
         },
       },
     },

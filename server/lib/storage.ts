@@ -386,7 +386,7 @@ export async function importQuestionnaireVersions(input: {
 
       if (questionnaireExists.rowCount) {
         await client.query(
-          "update questionnaires set title = $2, archived = $3, updated_at = now() where id = $1",
+          "update questionnaires set title = $2, archived = $3, deleted_at = null, updated_at = now() where id = $1",
           [questionnaire.id, questionnaire.title, !questionnaire.active],
         );
       } else {
@@ -447,11 +447,30 @@ export async function publishQuestionnaireVersion(input: {
   return inTransaction(async (client) => {
     const versionResult = input.versionId
       ? await client.query<QuestionnaireVersionRow>(
-        versionSelectSql("where id = $1 and questionnaire_id = $2"),
+        versionSelectSql(`
+          where id = $1
+            and questionnaire_id = $2
+            and exists (
+              select 1
+              from questionnaires
+              where questionnaires.id = questionnaire_versions.questionnaire_id
+                and questionnaires.deleted_at is null
+            )
+        `),
         [input.versionId, input.questionnaireId],
       )
       : await client.query<QuestionnaireVersionRow>(
-        versionSelectSql("where questionnaire_id = $1 order by version desc limit 1"),
+        versionSelectSql(`
+          where questionnaire_id = $1
+            and exists (
+              select 1
+              from questionnaires
+              where questionnaires.id = questionnaire_versions.questionnaire_id
+                and questionnaires.deleted_at is null
+            )
+          order by version desc
+          limit 1
+        `),
         [input.questionnaireId],
       );
     const version = versionResult.rows[0] ? mapQuestionnaireVersion(versionResult.rows[0]) : null;
@@ -508,7 +527,16 @@ export async function deleteQuestionnaireVersion(input: {
 }): Promise<boolean> {
   return inTransaction(async (client) => {
     const versionResult = await client.query<QuestionnaireVersionRow>(
-      versionSelectSql("where id = $1 and questionnaire_id = $2"),
+      versionSelectSql(`
+        where id = $1
+          and questionnaire_id = $2
+          and exists (
+            select 1
+            from questionnaires
+            where questionnaires.id = questionnaire_versions.questionnaire_id
+              and questionnaires.deleted_at is null
+          )
+      `),
       [input.versionId, input.questionnaireId],
     );
     const version = versionResult.rows[0] ? mapQuestionnaireVersion(versionResult.rows[0]) : null;
@@ -580,7 +608,7 @@ export async function deleteQuestionnaire(input: {
 }): Promise<boolean> {
   return inTransaction(async (client) => {
     const questionnaireResult = await client.query<QuestionnaireRow>(
-      questionnaireSelectSql("where id = $1"),
+      questionnaireSelectSql("where id = $1 and deleted_at is null"),
       [input.questionnaireId],
     );
     const questionnaire = questionnaireResult.rows[0]
@@ -597,9 +625,27 @@ export async function deleteQuestionnaire(input: {
     );
 
     if ((runCount.rows[0]?.count ?? 0) > 0) {
-      throw new StorageConflictError(
-        "Сценарий нельзя удалить: по нему уже есть черновики или завершённые прохождения.",
+      await client.query(
+        `
+          update questionnaires
+          set active_version_id = null,
+              archived = true,
+              deleted_at = now(),
+              updated_at = now()
+          where id = $1
+        `,
+        [input.questionnaireId],
       );
+      await client.query(
+        "update questionnaire_versions set published = false where questionnaire_id = $1",
+        [input.questionnaireId],
+      );
+      await addAuditLog(client, input.adminId, "questionnaire.soft_deleted", "questionnaire", input.questionnaireId, {
+        title: questionnaire.title,
+        preservedRuns: runCount.rows[0]?.count ?? 0,
+      });
+
+      return true;
     }
 
     await client.query(
@@ -623,7 +669,7 @@ export async function listQuestionnairesForAdmin() {
   await ensureInitialAdmin();
 
   const questionnairesResult = await pool.query<QuestionnaireRow>(
-    questionnaireSelectSql("order by updated_at desc, title"),
+    questionnaireSelectSql("where deleted_at is null order by updated_at desc, title"),
   );
   const versionsResult = await pool.query<QuestionnaireVersionRow>(
     versionSelectSql("order by questionnaire_id, version desc"),
@@ -662,14 +708,14 @@ export async function listQuestionnairesForAdminPage(input: PaginationInput = {}
   await ensureInitialAdmin();
   const { page: requestedPage, pageSize, search } = sanitizePagination(input);
   const params: unknown[] = [];
-  const conditions: string[] = [];
+  const conditions: string[] = ["deleted_at is null"];
 
   addQuestionnaireSearchCondition(conditions, params, search);
 
   const whereSql = conditions.length ? `where ${conditions.join(" and ")}` : "";
   const totalItems = await countRows(`select count(*)::int as count from questionnaires ${whereSql}`, params);
   const activeItems = await countRows(
-    `select count(*)::int as count from questionnaires ${conditions.length ? `where ${conditions.join(" and ")} and archived = false` : "where archived = false"}`,
+    `select count(*)::int as count from questionnaires where ${conditions.join(" and ")} and archived = false`,
     params,
   );
   const totalVersions = await countRows(
@@ -743,7 +789,7 @@ export async function listPublishedQuestionnaires() {
       v.imported_at
     from questionnaires q
     join questionnaire_versions v on v.id = q.active_version_id
-    where q.archived = false and v.published = true
+    where q.deleted_at is null and q.archived = false and v.published = true
     order by q.title
   `);
 
@@ -760,7 +806,7 @@ export async function listPublishedQuestionnairesPage(input: PaginationInput = {
   await ensureInitialAdmin();
   const { page: requestedPage, pageSize, search } = sanitizePagination(input);
   const params: unknown[] = [];
-  const conditions = ["q.archived = false", "v.published = true"];
+  const conditions = ["q.deleted_at is null", "q.archived = false", "v.published = true"];
 
   addSearchCondition(conditions, params, ["q.id", "q.title"], search, ["cast(v.version as text)"]);
 
@@ -816,7 +862,7 @@ export async function getPublishedQuestionnaire(questionnaireId: string) {
         v.source_json
       from questionnaires q
       join questionnaire_versions v on v.id = q.active_version_id
-      where q.id = $1 and q.archived = false and v.published = true
+      where q.id = $1 and q.deleted_at is null and q.archived = false and v.published = true
     `,
     [questionnaireId],
   );
@@ -837,7 +883,7 @@ export async function getPublishedQuestionnaire(questionnaireId: string) {
 export async function createRun(questionnaireId: string, operatorId: string): Promise<QuestionnaireRun | null> {
   return inTransaction(async (client) => {
     const questionnaire = await client.query<QuestionnaireRow>(
-      questionnaireSelectSql("where id = $1 and archived = false"),
+      questionnaireSelectSql("where id = $1 and deleted_at is null and archived = false"),
       [questionnaireId],
     );
     const item = questionnaire.rows[0] ? mapQuestionnaire(questionnaire.rows[0]) : null;
@@ -1384,6 +1430,7 @@ const questionnaireColumns = `
   title,
   active_version_id,
   archived,
+  deleted_at,
   created_at,
   updated_at
 `;
@@ -1545,6 +1592,7 @@ interface QuestionnaireRow {
   title: string;
   active_version_id: string | null;
   archived: boolean;
+  deleted_at: Date | string | null;
   created_at: Date | string;
   updated_at: Date | string;
 }
