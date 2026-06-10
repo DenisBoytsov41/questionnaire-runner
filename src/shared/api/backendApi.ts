@@ -1,4 +1,4 @@
-export type UserRole = "user" | "operator" | "admin";
+export type UserRole = "user" | "operator" | "admin" | "superadmin";
 
 export type UserPreferences = {
   theme: "light" | "dark";

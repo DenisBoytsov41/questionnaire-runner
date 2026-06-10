@@ -49,6 +49,7 @@ import {
 } from "./shared/api/backendApi";
 import { BrandHeader, type SettingsStatus } from "./shared/ui/BrandHeader";
 import { compressProfileImage } from "./shared/lib/profileImage";
+import { isAdminRole } from "./shared/lib/access";
 import "./App.css";
 
 const authTokenStorageKey = "ks-questionnaire-auth-token";
@@ -164,6 +165,7 @@ function App() {
   const activePreferences = currentUser?.preferences ?? defaultUserPreferences;
   const currentUserId = currentUser?.id;
   const currentUserRole = currentUser?.role;
+  const currentUserIsAdmin = currentUser ? isAdminRole(currentUser.role) : false;
 
   useEffect(() => {
     const root = document.documentElement;
@@ -332,7 +334,7 @@ function App() {
   }
 
   async function refreshAdminUsers() {
-    if (!authToken || currentUserRole !== "admin") {
+    if (!authToken || !currentUserIsAdmin) {
       return;
     }
 
@@ -352,7 +354,7 @@ function App() {
   }
 
   async function refreshAdminQuestionnaires() {
-    if (!authToken || currentUserRole !== "admin") {
+    if (!authToken || !currentUserIsAdmin) {
       return;
     }
 
@@ -423,7 +425,7 @@ function App() {
 
     setAdminUsersParams(nextParams);
 
-    if (!authToken || currentUserRole !== "admin") {
+    if (!authToken || !currentUserIsAdmin) {
       return;
     }
 
@@ -452,7 +454,7 @@ function App() {
 
     setAdminQuestionnairesParams(nextParams);
 
-    if (!authToken || currentUserRole !== "admin") {
+    if (!authToken || !currentUserIsAdmin) {
       return;
     }
 
@@ -867,7 +869,7 @@ function App() {
             active: isRunsPageOpen,
             onClick: handleOpenRunsPage,
           },
-          ...(currentUser.role === "admin"
+          ...(isAdminRole(currentUser.role)
             ? [
                 {
                   label: "Сценарии в базе",
@@ -1092,7 +1094,7 @@ function App() {
           onPageChange={handleCatalogPageChange}
           onPageSizeChange={handleCatalogPageSizeChange}
           onOpenManualUpload={handleOpenManualUpload}
-          onOpenAdminQuestionnaires={currentUser.role === "admin" ? handleOpenAdminQuestionnairesPage : undefined}
+          onOpenAdminQuestionnaires={isAdminRole(currentUser.role) ? handleOpenAdminQuestionnairesPage : undefined}
           {...sharedHeaderProps}
         />
       )}

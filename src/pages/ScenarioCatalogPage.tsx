@@ -1,4 +1,5 @@
 import type { CurrentUser, PaginationMeta, PublishedQuestionnaire, UserPreferences } from "../shared/api/backendApi";
+import { isAdminRole } from "../shared/lib/access";
 import { BrandHeader, type HeaderNavigationItem, type SettingsStatus } from "../shared/ui/BrandHeader";
 import { Pagination } from "../shared/ui/Pagination";
 
@@ -48,8 +49,8 @@ export function ScenarioCatalogPage({
       <BrandHeader
         subtitle="Рабочее место оператора"
         action={{
-          label: user.role === "admin" && onOpenAdminQuestionnaires ? "Сценарии в базе" : "Загрузить файл вручную",
-          onClick: user.role === "admin" && onOpenAdminQuestionnaires ? onOpenAdminQuestionnaires : onOpenManualUpload,
+          label: isAdminRole(user.role) && onOpenAdminQuestionnaires ? "Сценарии в базе" : "Загрузить файл вручную",
+          onClick: isAdminRole(user.role) && onOpenAdminQuestionnaires ? onOpenAdminQuestionnaires : onOpenManualUpload,
         }}
         navigationItems={navigationItems}
         user={user}
@@ -102,7 +103,7 @@ export function ScenarioCatalogPage({
             </p>
 
             <div className="scenario-empty-actions">
-              {user.role === "admin" && onOpenAdminQuestionnaires ? (
+              {isAdminRole(user.role) && onOpenAdminQuestionnaires ? (
                 <button type="button" className="primary-button" onClick={onOpenAdminQuestionnaires}>
                   Загрузить сценарий в базу
                 </button>

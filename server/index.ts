@@ -9,6 +9,7 @@ import {
   convertTreePackageToQuestionnaireInput,
   questionnaireTreePackageSchema,
 } from "./lib/questionnaireTreeFormat.js";
+import { canAssignUserRole } from "./lib/access.js";
 import type { QuestionnaireRun, UserPreferences, UserRole } from "./types.js";
 import { signToken, toPublicUser, verifyPassword } from "./lib/crypto.js";
 import {
@@ -57,6 +58,8 @@ import { attachRequestLogger, logError, logInfo, logWarn } from "./lib/logger.js
 const port = Number(process.env.PORT ?? 4100);
 const jwtSecret = process.env.JWT_SECRET ?? "dev-secret-change-me";
 const maxAvatarImagePayloadLength = 14_500_000;
+const adminRoles: UserRole[] = ["admin", "superadmin"];
+const operatorRoles: UserRole[] = ["operator", "admin", "superadmin"];
 
 function readPaginationQuery(url: URL) {
   return {
@@ -69,7 +72,9 @@ function readPaginationQuery(url: URL) {
 function readUserListQuery(url: URL) {
   const role = url.searchParams.get("role");
   const normalizedRole: UserRole | "all" =
-    role === "user" || role === "operator" || role === "admin" ? role : "all";
+    role === "user" || role === "operator" || role === "admin" || role === "superadmin"
+      ? role
+      : "all";
 
   return {
     ...readPaginationQuery(url),
@@ -113,7 +118,7 @@ const createAdminUserSchema = z.object({
   email: z.string().trim().email().or(z.literal("")).optional(),
   phone: z.string().trim().max(50).optional(),
   position: z.string().trim().max(120).optional(),
-  role: z.enum(["user", "operator", "admin"]).default("operator"),
+  role: z.enum(["user", "operator", "admin", "superadmin"]).default("operator"),
   active: z.boolean().default(true),
 });
 
@@ -128,7 +133,7 @@ const changePasswordSchema = z.object({
 });
 
 const updateUserRoleSchema = z.object({
-  role: z.enum(["user", "operator", "admin"]),
+  role: z.enum(["user", "operator", "admin", "superadmin"]),
   active: z.boolean().optional(),
 });
 
@@ -270,29 +275,36 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.method === "GET" && parts[1] === "users") {
-      requireRole(context, ["admin"]);
+      requireRole(context, adminRoles);
       const page = await listUsersPage(readUserListQuery(context.url));
       sendJson(res, 200, { users: page.items, pagination: page.pagination });
       return;
     }
 
     if (req.method === "POST" && parts[1] === "admin" && parts[2] === "users") {
-      requireRole(context, ["admin"]);
+      const admin = requireRole(context, adminRoles);
       const body = createAdminUserSchema.parse(await readJsonBody(req));
+
+      if (body.role === "superadmin") {
+        throw new HttpError(403, "Создать второго главного администратора нельзя.");
+      }
+
+      if (!canAssignUserRole(admin.role, body.role)) {
+        throw new HttpError(403, "Только главный администратор может создавать других администраторов.");
+      }
+
       const user = await createUser(body);
       sendJson(res, 201, { user });
       return;
     }
 
     if (req.method === "PATCH" && parts[1] === "users" && parts[2]) {
-      const admin = requireRole(context, ["admin"]);
+      const admin = requireRole(context, adminRoles);
       const body = updateUserRoleSchema.parse(await readJsonBody(req));
 
-      if (parts[2] === admin.id && body.role !== admin.role) {
-        throw new HttpError(409, "Нельзя менять роль своей учётной записи.");
-      }
-
       const user = await updateUserAdmin({
+        actorId: admin.id,
+        actorRole: admin.role,
         userId: parts[2],
         role: body.role,
         active: body.active,
@@ -307,14 +319,14 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.method === "GET" && parts[1] === "questionnaires" && !parts[2]) {
-      requireRole(context, ["operator", "admin"]);
+      requireRole(context, operatorRoles);
       const page = await listPublishedQuestionnairesPage(readPaginationQuery(context.url));
       sendJson(res, 200, { questionnaires: page.items, pagination: page.pagination });
       return;
     }
 
     if (req.method === "GET" && parts[1] === "questionnaires" && parts[2]) {
-      requireRole(context, ["operator", "admin"]);
+      requireRole(context, operatorRoles);
       const questionnaire = await getPublishedQuestionnaire(parts[2]);
 
       if (!questionnaire) {
@@ -326,7 +338,7 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.method === "POST" && parts[1] === "admin" && parts[2] === "questionnaires" && parts[3] === "import") {
-      const admin = requireRole(context, ["admin"]);
+      const admin = requireRole(context, adminRoles);
       const body = await readJsonBody(req);
       const result = await importQuestionnaires(body, admin.id);
       sendJson(res, 201, result);
@@ -334,7 +346,7 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.method === "GET" && parts[1] === "admin" && parts[2] === "questionnaires" && !parts[3]) {
-      requireRole(context, ["admin"]);
+      requireRole(context, adminRoles);
       const page = await listQuestionnairesForAdminPage(readPaginationQuery(context.url));
       sendJson(res, 200, { questionnaires: page.items, pagination: page.pagination, summary: page.summary });
       return;
@@ -347,7 +359,7 @@ const server = createServer(async (req, res) => {
       && parts[3]
       && parts[4] === "publish"
     ) {
-      const admin = requireRole(context, ["admin"]);
+      const admin = requireRole(context, adminRoles);
       const body = publishQuestionnaireSchema.parse(await readJsonBody(req));
       const result = await publishQuestionnaireVersion({
         questionnaireId: parts[3],
@@ -371,7 +383,7 @@ const server = createServer(async (req, res) => {
       && parts[4] === "versions"
       && parts[5]
     ) {
-      const admin = requireRole(context, ["admin"]);
+      const admin = requireRole(context, adminRoles);
       const deleted = await deleteQuestionnaireVersion({
         questionnaireId: parts[3],
         versionId: parts[5],
@@ -393,7 +405,7 @@ const server = createServer(async (req, res) => {
       && parts[3]
       && !parts[4]
     ) {
-      const admin = requireRole(context, ["admin"]);
+      const admin = requireRole(context, adminRoles);
       const deleted = await deleteQuestionnaire({
         questionnaireId: parts[3],
         adminId: admin.id,
@@ -408,7 +420,7 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.method === "POST" && parts[1] === "questionnaire-runs" && !parts[2]) {
-      const user = requireRole(context, ["operator", "admin"]);
+      const user = requireRole(context, operatorRoles);
       const body = createRunSchema.parse(await readJsonBody(req));
       const run = await createRun(body.questionnaireId, user.id);
 
@@ -421,7 +433,7 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.method === "PATCH" && parts[1] === "questionnaire-runs" && parts[2] && parts[3] === "draft") {
-      const user = requireRole(context, ["operator", "admin"]);
+      const user = requireRole(context, operatorRoles);
       const body = runPayloadSchema.parse(await readJsonBody(req));
       const run = await updateRunDraft({
         runId: parts[2],
@@ -439,7 +451,7 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.method === "POST" && parts[1] === "questionnaire-runs" && parts[2] && parts[3] === "finish") {
-      const user = requireRole(context, ["operator", "admin"]);
+      const user = requireRole(context, operatorRoles);
       const body = runPayloadSchema.parse(await readJsonBody(req));
       const run = await finishRun({
         runId: parts[2],
@@ -457,14 +469,14 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.method === "GET" && parts[1] === "questionnaire-runs" && !parts[2]) {
-      const user = requireRole(context, ["operator", "admin"]);
+      const user = requireRole(context, operatorRoles);
       const page = await listRunsForUserPage(user.id, user.role, readRunListQuery(context.url));
       sendJson(res, 200, { runs: page.items, pagination: page.pagination, summary: page.summary });
       return;
     }
 
     if (req.method === "DELETE" && parts[1] === "questionnaire-runs" && parts[2]) {
-      const user = requireRole(context, ["operator", "admin"]);
+      const user = requireRole(context, operatorRoles);
       const deleted = await deleteDraftRun({
         runId: parts[2],
         userId: user.id,
@@ -480,7 +492,7 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.method === "GET" && parts[1] === "questionnaire-runs" && parts[2]) {
-      const user = requireRole(context, ["operator", "admin"]);
+      const user = requireRole(context, operatorRoles);
       const run = await getRunForUser(parts[2], user.id, user.role);
 
       if (!run) {
@@ -517,8 +529,8 @@ const server = createServer(async (req, res) => {
 
 server.listen(port, () => {
   logInfo("server", "Backend запущен", { url: `http://localhost:${port}` });
-  logInfo("server", "Первый администратор создаётся автоматически, если таблица пользователей пустая");
-  logInfo("server", "Логин и пароль администратора можно задать через ADMIN_LOGIN и ADMIN_PASSWORD");
+  logInfo("server", "Учётная запись из ADMIN_LOGIN назначается главным администратором");
+  logInfo("server", "Логин и пароль главного администратора задаются через ADMIN_LOGIN и ADMIN_PASSWORD");
 });
 
 let isShuttingDown = false;

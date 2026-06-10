@@ -9,6 +9,7 @@ import type {
   UserRole,
 } from "../types.js";
 import type { Questionnaire } from "./questionnaireContract.js";
+import { canAssignUserRole, canManageUserRole, isAdminRole } from "./access.js";
 import { createId, hashPassword, toPublicUser, verifyPassword } from "./crypto.js";
 import { logWarn } from "./logger.js";
 
@@ -180,11 +181,40 @@ export async function createUser(input: {
 }
 
 export async function updateUserAdmin(input: {
+  actorId: string;
+  actorRole: UserRole;
   userId: string;
   role: UserRole;
   active?: boolean;
 }): Promise<PublicUser | null> {
   return inTransaction(async (client) => {
+    const currentResult = await client.query<UserRow>(userSelectSql("where id = $1"), [input.userId]);
+    const currentUser = currentResult.rows[0] ? mapUser(currentResult.rows[0]) : null;
+
+    if (!currentUser) {
+      return null;
+    }
+
+    if (currentUser.id === input.actorId) {
+      throw new StorageConflictError("Нельзя менять роль или закрывать вход своей учётной записи.");
+    }
+
+    if (!canManageUserRole(input.actorRole, currentUser.role)) {
+      throw new StorageForbiddenError(
+        currentUser.role === "superadmin"
+          ? "Учётная запись главного администратора защищена от изменения."
+          : "Только главный администратор может управлять другими администраторами.",
+      );
+    }
+
+    if (input.role === "superadmin") {
+      throw new StorageForbiddenError("Назначить второго главного администратора нельзя.");
+    }
+
+    if (!canAssignUserRole(input.actorRole, input.role)) {
+      throw new StorageForbiddenError("Только главный администратор может назначать роль администратора.");
+    }
+
     const result = await client.query<UserRow>(
       `
         update users
@@ -200,7 +230,7 @@ export async function updateUserAdmin(input: {
     const user = result.rows[0] ? mapUser(result.rows[0]) : null;
 
     if (user) {
-      await addAuditLog(client, null, "user.admin_updated", "user", user.id, {
+      await addAuditLog(client, input.actorId, "user.admin_updated", "user", user.id, {
         role: user.role,
         active: user.active,
       });
@@ -821,7 +851,7 @@ export async function getRunForUser(runId: string, userId: string, role: UserRol
     return null;
   }
 
-  if (role !== "admin" && run.operatorId !== userId) {
+  if (!isAdminRole(role) && run.operatorId !== userId) {
     throw new StorageForbiddenError("Нет доступа к этому прохождению.");
   }
 
@@ -830,7 +860,7 @@ export async function getRunForUser(runId: string, userId: string, role: UserRol
 
 export async function listRunsForUser(userId: string, role: UserRole): Promise<QuestionnaireRun[]> {
   await ensureInitialAdmin();
-  const result = role === "admin"
+  const result = isAdminRole(role)
     ? await pool.query<QuestionnaireRunRow>(runSelectSql("order by started_at desc"))
     : await pool.query<QuestionnaireRunRow>(runSelectSql("where operator_id = $1 order by started_at desc"), [userId]);
 
@@ -851,7 +881,7 @@ export async function listRunsForUserPage(
   const params: unknown[] = [];
   const conditions: string[] = [];
 
-  if (role !== "admin") {
+  if (!isAdminRole(role)) {
     params.push(userId);
     conditions.push(`operator_id = $${params.length}`);
   }
@@ -909,7 +939,7 @@ export async function deleteDraftRun(input: {
       return false;
     }
 
-    if (input.role !== "admin" && currentRun.operatorId !== input.userId) {
+    if (!isAdminRole(input.role) && currentRun.operatorId !== input.userId) {
       throw new StorageForbiddenError("Нет доступа к этому прохождению.");
     }
 
@@ -963,7 +993,7 @@ async function updateRun(input: {
       return null;
     }
 
-    if (input.role !== "admin" && currentRun.operatorId !== input.userId) {
+    if (!isAdminRole(input.role) && currentRun.operatorId !== input.userId) {
       throw new StorageForbiddenError("Нет доступа к этому прохождению.");
     }
 
@@ -1049,25 +1079,41 @@ async function ensureInitialAdmin(existingClient?: PoolClient): Promise<void> {
   const client = existingClient ?? await pool.connect();
 
   try {
-    const usersCount = await client.query<{ count: string }>("select count(*) from users");
+    const adminLogin = process.env.ADMIN_LOGIN?.trim() || "admin";
+    const existingAdmin = await client.query<UserRow>(
+      userSelectSql("where lower(login) = lower($1)"),
+      [adminLogin],
+    );
 
-    if (Number(usersCount.rows[0]?.count ?? 0) > 0) {
+    if (existingAdmin.rows[0]) {
+      if (existingAdmin.rows[0].role !== "superadmin" || !existingAdmin.rows[0].active) {
+        await client.query(
+          `
+            update users
+            set role = 'superadmin',
+                active = true,
+                updated_at = now()
+            where id = $1
+          `,
+          [existingAdmin.rows[0].id],
+        );
+      }
+
       return;
     }
 
     const now = new Date().toISOString();
-    const adminLogin = process.env.ADMIN_LOGIN?.trim() || "admin";
     const adminPassword = process.env.ADMIN_PASSWORD?.trim() || "KService-Admin-2026!";
     const { hash, salt } = hashPassword(adminPassword);
 
     await insertUser(client, {
       id: createId("usr"),
       login: adminLogin,
-      fullName: "Администратор",
+      fullName: "Главный администратор",
       email: "",
       phone: "",
-      position: "Администратор",
-      role: "admin",
+      position: "Главный администратор",
+      role: "superadmin",
       active: true,
       preferences: defaultPreferences,
       passwordHash: hash,
