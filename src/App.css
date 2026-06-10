@@ -5439,8 +5439,7 @@ html[data-text-scale="xlarge"] .top-bar .view-menu .view-settings-button {
 }
 
 .scenario-catalog-grid {
-  grid-template-columns: repeat(auto-fill, minmax(270px, 300px));
-  justify-content: start;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   align-items: stretch;
 }
 
@@ -6618,6 +6617,18 @@ html[data-theme="dark"][data-vision="high-contrast"] .run-status.finished {
   border: 1px solid #bbf7d0;
   background: #bbf7d0;
   color: #052e16;
+}
+
+@media (max-width: 1180px) {
+  .scenario-catalog-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .scenario-catalog-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 760px) {
