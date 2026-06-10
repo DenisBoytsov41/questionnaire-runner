@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import type {
   AdminUser,
+  AdminUsersSummary,
   CreateAdminUserInput,
   CurrentUser,
   ListPageParams,
@@ -15,6 +16,7 @@ import { RoundedSelect } from "../shared/ui/RoundedSelect";
 
 interface AdminUsersPageProps {
   users: AdminUser[];
+  summary: AdminUsersSummary;
   pagination: PaginationMeta;
   params: Required<Pick<ListPageParams, "page" | "pageSize" | "search" | "role">>;
   status: "loading" | "ready" | "error";
@@ -57,6 +59,7 @@ const roleOptions: Array<{ value: UserRole; label: string; description: string }
 
 export function AdminUsersPage({
   users,
+  summary,
   pagination,
   params,
   status,
@@ -177,9 +180,9 @@ export function AdminUsersPage({
           </div>
 
           <div className="admin-users-metrics">
-            <AdminMetric label="Всего" value={pagination.totalItems} />
-            <AdminMetric label="Операторы" value={users.filter((item) => item.role === "operator").length} />
-            <AdminMetric label="Без доступа" value={users.filter((item) => item.role === "user").length} />
+            <AdminMetric label="Всего" value={summary.totalUsers} />
+            <AdminMetric label="Операторы" value={summary.operatorUsers} />
+            <AdminMetric label="Без доступа" value={summary.noAccessUsers} />
           </div>
         </div>
 

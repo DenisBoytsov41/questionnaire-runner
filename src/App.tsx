@@ -16,6 +16,7 @@ import type {
   AdminQuestionnaire,
   AdminQuestionnairesSummary,
   AdminUser,
+  AdminUsersSummary,
   ChangePasswordInput,
   CreateAdminUserInput,
   ImportQuestionnairesResult,
@@ -74,6 +75,12 @@ const emptyRunsSummary: QuestionnaireRunsSummary = {
   finishedRuns: 0,
 };
 
+const emptyAdminUsersSummary: AdminUsersSummary = {
+  totalUsers: 0,
+  operatorUsers: 0,
+  noAccessUsers: 0,
+};
+
 const catalogInitialParams: Required<Pick<ListPageParams, "page" | "pageSize" | "search">> = {
   page: 1,
   pageSize: 5,
@@ -129,6 +136,7 @@ function App() {
   const [runsStatus, setRunsStatus] = useState<"loading" | "ready" | "error">("loading");
   const [runsError, setRunsError] = useState("");
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
+  const [adminUsersSummary, setAdminUsersSummary] = useState<AdminUsersSummary>(emptyAdminUsersSummary);
   const [adminUsersParams, setAdminUsersParams] = useState(adminUsersInitialParams);
   const [adminUsersPagination, setAdminUsersPagination] = useState<PaginationMeta>({
     ...emptyPagination,
@@ -345,9 +353,11 @@ function App() {
       const page = await loadUsersPage(authToken, adminUsersParams);
       setAdminUsers(page.items);
       setAdminUsersPagination(page.pagination);
+      setAdminUsersSummary(page.summary);
       setAdminUsersStatus("ready");
     } catch (error) {
       setAdminUsers([]);
+      setAdminUsersSummary(emptyAdminUsersSummary);
       setAdminUsersStatus("error");
       setAdminUsersError(error instanceof Error ? error.message : "Не удалось получить список пользователей.");
     }
@@ -436,10 +446,12 @@ function App() {
       .then((page) => {
         setAdminUsers(page.items);
         setAdminUsersPagination(page.pagination);
+        setAdminUsersSummary(page.summary);
         setAdminUsersStatus("ready");
       })
       .catch((error) => {
         setAdminUsers([]);
+        setAdminUsersSummary(emptyAdminUsersSummary);
         setAdminUsersStatus("error");
         setAdminUsersError(error instanceof Error ? error.message : "РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№.");
       });
@@ -998,6 +1010,7 @@ function App() {
       <>
         <AdminUsersPage
           users={adminUsers}
+          summary={adminUsersSummary}
           pagination={adminUsersPagination}
           params={adminUsersParams}
           status={adminUsersStatus}

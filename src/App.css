@@ -3743,17 +3743,18 @@ html[data-theme="dark"] .view-settings-footer {
   }
 
   .top-bar .top-bar-actions {
-    display: flex;
-    flex-wrap: nowrap;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(150px, 1fr)) auto;
+    width: 100%;
     gap: 8px;
   }
 
   .top-file-button {
-    flex: 1 1 210px;
+    width: 100%;
   }
 
   .view-menu {
-    flex: 1 1 180px;
+    width: 100%;
   }
 
   .view-menu-toggle {
@@ -3761,7 +3762,7 @@ html[data-theme="dark"] .view-settings-footer {
   }
 
   button.operator-profile {
-    flex: 0 0 auto;
+    justify-self: end;
   }
 }
 

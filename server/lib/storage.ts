@@ -99,11 +99,17 @@ export async function listUsers(): Promise<PublicUser[]> {
   return result.rows.map(mapUser).map(toPublicUser);
 }
 
-export async function listUsersPage(input: PaginationInput = {}): Promise<PaginatedResult<PublicUser>> {
+export async function listUsersPage(input: PaginationInput = {}): Promise<PaginatedResult<PublicUser, {
+  totalUsers: number;
+  operatorUsers: number;
+  noAccessUsers: number;
+}>> {
   await ensureInitialAdmin();
   const { page: requestedPage, pageSize, search } = sanitizePagination(input);
   const params: unknown[] = [];
   const conditions: string[] = [];
+  const summaryParams: unknown[] = [];
+  const summaryConditions: string[] = [];
 
   if (input.role && input.role !== "all") {
     params.push(input.role);
@@ -111,9 +117,31 @@ export async function listUsersPage(input: PaginationInput = {}): Promise<Pagina
   }
 
   addSearchCondition(conditions, params, ["login", "full_name", "email", "phone", "position"], search);
+  addSearchCondition(
+    summaryConditions,
+    summaryParams,
+    ["login", "full_name", "email", "phone", "position"],
+    search,
+  );
 
   const whereSql = conditions.length ? `where ${conditions.join(" and ")}` : "";
+  const summaryWhereSql = summaryConditions.length ? `where ${summaryConditions.join(" and ")}` : "";
   const totalItems = await countRows(`select count(*)::int as count from users ${whereSql}`, params);
+  const summaryResult = await pool.query<{
+    total_users: number;
+    operator_users: number;
+    no_access_users: number;
+  }>(
+    `
+      select
+        count(*)::int as total_users,
+        count(*) filter (where role = 'operator')::int as operator_users,
+        count(*) filter (where role = 'user')::int as no_access_users
+      from users
+      ${summaryWhereSql}
+    `,
+    summaryParams,
+  );
   const pagination = buildPagination(totalItems, requestedPage, pageSize);
   const pageParams = [...params, pagination.pageSize, (pagination.page - 1) * pagination.pageSize];
   const result = await pool.query<UserRow>(
@@ -124,6 +152,11 @@ export async function listUsersPage(input: PaginationInput = {}): Promise<Pagina
   return {
     items: result.rows.map(mapUser).map(toPublicUser),
     pagination,
+    summary: {
+      totalUsers: summaryResult.rows[0]?.total_users ?? 0,
+      operatorUsers: summaryResult.rows[0]?.operator_users ?? 0,
+      noAccessUsers: summaryResult.rows[0]?.no_access_users ?? 0,
+    },
   };
 }
 

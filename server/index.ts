@@ -277,7 +277,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && parts[1] === "users") {
       requireRole(context, adminRoles);
       const page = await listUsersPage(readUserListQuery(context.url));
-      sendJson(res, 200, { users: page.items, pagination: page.pagination });
+      sendJson(res, 200, { users: page.items, pagination: page.pagination, summary: page.summary });
       return;
     }
 
