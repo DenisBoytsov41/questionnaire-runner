@@ -501,9 +501,24 @@ export async function deleteQuestionnaireVersion(input: {
     );
 
     if ((versionCount.rows[0]?.count ?? 0) <= 1) {
-      throw new StorageConflictError(
-        "Это единственная версия сценария. Для полного удаления используйте кнопку «Удалить сценарий».",
+      await client.query(
+        `
+          update questionnaires
+          set active_version_id = null,
+              archived = true,
+              updated_at = now()
+          where id = $1
+        `,
+        [input.questionnaireId],
       );
+      await client.query("delete from questionnaire_versions where id = $1", [input.versionId]);
+      await client.query("delete from questionnaires where id = $1", [input.questionnaireId]);
+      await addAuditLog(client, input.adminId, "questionnaire.deleted_with_last_version", "questionnaire", input.questionnaireId, {
+        versionId: input.versionId,
+        version: version.version,
+      });
+
+      return true;
     }
 
     await client.query(

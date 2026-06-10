@@ -173,11 +173,15 @@ export function AdminQuestionnairesPage({
     versionNumber: number,
     isCurrent: boolean,
   ) {
+    const isLastVersion = questionnaire.versions.length === 1;
     const currentWarning = isCurrent
       ? "\n\nЭто текущая версия. После удаления сценарий исчезнет из рабочего места операторов."
       : "";
+    const lastVersionWarning = isLastVersion
+      ? "\n\nЭто единственная версия, поэтому сценарий также будет полностью удалён."
+      : "";
     const confirmed = window.confirm(
-      `Удалить версию ${versionNumber} сценария «${questionnaire.title}»?${currentWarning}`,
+      `Удалить версию ${versionNumber} сценария «${questionnaire.title}»?${currentWarning}${lastVersionWarning}`,
     );
 
     if (!confirmed) {
