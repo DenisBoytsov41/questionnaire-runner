@@ -3468,12 +3468,14 @@ html[data-vision="high-contrast"] .top-bar .view-menu .view-settings {
 }
 
 .workplace-title strong {
-  overflow: hidden;
+  overflow: visible;
   color: var(--ks-ink);
   font-size: 18px;
   line-height: 1.15;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: break-word;
+  text-overflow: clip;
+  text-wrap: balance;
+  white-space: normal;
 }
 
 .top-bar .top-bar-actions {
