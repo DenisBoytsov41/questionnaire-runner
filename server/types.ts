@@ -1,6 +1,6 @@
 import type { Questionnaire } from "./lib/questionnaireContract.js";
 
-export type UserRole = "user" | "operator" | "admin";
+export type UserRole = "user" | "operator" | "admin" | "superadmin";
 export type QuestionAnswer = string | string[] | boolean | number | null;
 
 export interface StoredUser {

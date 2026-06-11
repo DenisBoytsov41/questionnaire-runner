@@ -1,4 +1,4 @@
-export type UserRole = "user" | "operator" | "admin";
+export type UserRole = "user" | "operator" | "admin" | "superadmin";
 
 export type UserPreferences = {
   theme: "light" | "dark";
@@ -31,6 +31,12 @@ export type CurrentUser = {
 };
 
 export type AdminUser = CurrentUser;
+
+export type AdminUsersSummary = {
+  totalUsers: number;
+  operatorUsers: number;
+  noAccessUsers: number;
+};
 
 export type LoginResult = {
   token: string;
@@ -221,15 +227,26 @@ export async function changeCurrentUserPassword(
 export async function loadUsersPage(
   token: string,
   params: ListPageParams = {},
-): Promise<PaginatedList<AdminUser>> {
-  const result = await apiRequest<{ users: AdminUser[]; pagination?: PaginationMeta }>(
+): Promise<PaginatedList<AdminUser> & { summary: AdminUsersSummary }> {
+  const result = await apiRequest<{
+    users: AdminUser[];
+    pagination?: PaginationMeta;
+    summary?: AdminUsersSummary;
+  }>(
     `/api/users${buildListQuery(params)}`,
     {
       token,
     },
   );
 
-  return normalizePaginatedList(result.users, result.pagination);
+  return {
+    ...normalizePaginatedList(result.users, result.pagination),
+    summary: result.summary ?? {
+      totalUsers: result.users.length,
+      operatorUsers: result.users.filter((user) => user.role === "operator").length,
+      noAccessUsers: result.users.filter((user) => user.role === "user").length,
+    },
+  };
 }
 
 export async function createAdminUser(

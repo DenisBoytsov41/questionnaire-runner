@@ -145,7 +145,7 @@ export function AdminQuestionnairesPage({
 
   async function deleteQuestionnaire(questionnaire: AdminQuestionnaire) {
     const confirmed = window.confirm(
-      `Удалить сценарий «${questionnaire.title}» и все его версии?\n\nСценарий нельзя будет восстановить.`,
+      `Удалить сценарий «${questionnaire.title}»?\n\nОн исчезнет из списка и рабочего места операторов. Сохранённые прохождения останутся в истории.`,
     );
 
     if (!confirmed) {
@@ -173,11 +173,15 @@ export function AdminQuestionnairesPage({
     versionNumber: number,
     isCurrent: boolean,
   ) {
+    const isLastVersion = questionnaire.versions.length === 1;
     const currentWarning = isCurrent
       ? "\n\nЭто текущая версия. После удаления сценарий исчезнет из рабочего места операторов."
       : "";
+    const lastVersionWarning = isLastVersion
+      ? "\n\nЭто единственная версия, поэтому сценарий также будет полностью удалён."
+      : "";
     const confirmed = window.confirm(
-      `Удалить версию ${versionNumber} сценария «${questionnaire.title}»?${currentWarning}`,
+      `Удалить версию ${versionNumber} сценария «${questionnaire.title}»?${currentWarning}${lastVersionWarning}`,
     );
 
     if (!confirmed) {

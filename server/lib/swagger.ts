@@ -143,7 +143,7 @@ const openApiDocument = {
           email: { type: "string", example: "operator@k-service44.ru" },
           phone: { type: "string", example: "+7 900 000-00-00" },
           position: { type: "string", example: "Оператор первой линии" },
-          role: { type: "string", enum: ["user", "operator", "admin"] },
+          role: { type: "string", enum: ["user", "operator", "admin", "superadmin"] },
           active: { type: "boolean" },
           preferences: { $ref: "#/components/schemas/UserPreferences" },
         },
@@ -194,8 +194,8 @@ const openApiDocument = {
         properties: {
           role: {
             type: "string",
-            enum: ["user", "operator", "admin"],
-            description: "user - без доступа, operator - оператор, admin - администратор.",
+            enum: ["user", "operator", "admin", "superadmin"],
+            description: "user - без доступа, operator - оператор, admin - администратор, superadmin - главный администратор.",
             example: "operator",
           },
           active: {
@@ -215,9 +215,9 @@ const openApiDocument = {
           fullName: { type: "string", example: "Иванов Иван" },
           role: {
             type: "string",
-            enum: ["user", "operator", "admin"],
+            enum: ["user", "operator", "admin", "superadmin"],
             default: "operator",
-            description: "user - без доступа, operator - оператор, admin - администратор.",
+            description: "user - без доступа, operator - оператор, admin - администратор, superadmin - главный администратор.",
           },
           active: {
             type: "boolean",
@@ -363,7 +363,7 @@ const openApiDocument = {
         tags: ["Пользователи"],
         security: [{ bearerAuth: [] }],
         summary: "Создать сотрудника, только администратор",
-        description: "Администратор создаёт учётную запись, задаёт временный пароль и сразу назначает роль: без доступа, оператор или администратор.",
+        description: "Администратор создаёт пользователей без доступа и операторов. Только главный администратор может создавать и назначать администраторов.",
         requestBody: {
           required: true,
           content: {
@@ -401,7 +401,7 @@ const openApiDocument = {
         tags: ["Пользователи"],
         security: [{ bearerAuth: [] }],
         summary: "Изменить роль или активность пользователя",
-        description: "Маршрут доступен только администратору. Используется для назначения роли: без доступа, оператор или администратор, а также для временного закрытия входа сотруднику.",
+        description: "Администратор управляет пользователями и операторами. Роль и доступ администраторов может менять только главный администратор. Учётная запись главного администратора защищена.",
         parameters: [pathParameter("id", "Идентификатор пользователя")],
         requestBody: {
           required: true,
@@ -514,12 +514,11 @@ const openApiDocument = {
       delete: {
         tags: ["Опросники"],
         security: [{ bearerAuth: [] }],
-        summary: "Удалить сценарий вместе с версиями, если по нему нет прохождений",
+        summary: "Удалить сценарий; связанные прохождения сохраняются в истории",
         parameters: [pathParameter("id", "Идентификатор сценария")],
         responses: {
           200: response("Сценарий удалён", { deleted: { type: "boolean" } }),
           404: errorResponse("Сценарий не найден"),
-          409: errorResponse("По сценарию уже есть прохождения"),
         },
       },
     },

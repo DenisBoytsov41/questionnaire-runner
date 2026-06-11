@@ -3468,12 +3468,14 @@ html[data-vision="high-contrast"] .top-bar .view-menu .view-settings {
 }
 
 .workplace-title strong {
-  overflow: hidden;
+  overflow: visible;
   color: var(--ks-ink);
   font-size: 18px;
   line-height: 1.15;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: break-word;
+  text-overflow: clip;
+  text-wrap: balance;
+  white-space: normal;
 }
 
 .top-bar .top-bar-actions {
@@ -3741,17 +3743,18 @@ html[data-theme="dark"] .view-settings-footer {
   }
 
   .top-bar .top-bar-actions {
-    display: flex;
-    flex-wrap: nowrap;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(150px, 1fr)) auto;
+    width: 100%;
     gap: 8px;
   }
 
   .top-file-button {
-    flex: 1 1 210px;
+    width: 100%;
   }
 
   .view-menu {
-    flex: 1 1 180px;
+    width: 100%;
   }
 
   .view-menu-toggle {
@@ -3759,7 +3762,7 @@ html[data-theme="dark"] .view-settings-footer {
   }
 
   button.operator-profile {
-    flex: 0 0 auto;
+    justify-self: end;
   }
 }
 
@@ -5437,8 +5440,7 @@ html[data-text-scale="xlarge"] .top-bar .view-menu .view-settings-button {
 }
 
 .scenario-catalog-grid {
-  grid-template-columns: repeat(auto-fill, minmax(270px, 300px));
-  justify-content: start;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   align-items: stretch;
 }
 
@@ -6616,6 +6618,18 @@ html[data-theme="dark"][data-vision="high-contrast"] .run-status.finished {
   border: 1px solid #bbf7d0;
   background: #bbf7d0;
   color: #052e16;
+}
+
+@media (max-width: 1180px) {
+  .scenario-catalog-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .scenario-catalog-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 760px) {

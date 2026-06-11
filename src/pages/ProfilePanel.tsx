@@ -474,6 +474,10 @@ export function ProfilePanel({ user, onClose, onSave, onChangePassword }: Profil
 }
 
 function getRoleLabel(role: CurrentUser["role"]): string {
+  if (role === "superadmin") {
+    return "Главный администратор";
+  }
+
   if (role === "admin") {
     return "Администратор";
   }

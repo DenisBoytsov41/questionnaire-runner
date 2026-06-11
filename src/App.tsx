@@ -16,6 +16,7 @@ import type {
   AdminQuestionnaire,
   AdminQuestionnairesSummary,
   AdminUser,
+  AdminUsersSummary,
   ChangePasswordInput,
   CreateAdminUserInput,
   ImportQuestionnairesResult,
@@ -49,6 +50,7 @@ import {
 } from "./shared/api/backendApi";
 import { BrandHeader, type SettingsStatus } from "./shared/ui/BrandHeader";
 import { compressProfileImage } from "./shared/lib/profileImage";
+import { isAdminRole } from "./shared/lib/access";
 import "./App.css";
 
 const authTokenStorageKey = "ks-questionnaire-auth-token";
@@ -71,6 +73,12 @@ const emptyRunsSummary: QuestionnaireRunsSummary = {
   totalRuns: 0,
   draftRuns: 0,
   finishedRuns: 0,
+};
+
+const emptyAdminUsersSummary: AdminUsersSummary = {
+  totalUsers: 0,
+  operatorUsers: 0,
+  noAccessUsers: 0,
 };
 
 const catalogInitialParams: Required<Pick<ListPageParams, "page" | "pageSize" | "search">> = {
@@ -128,6 +136,7 @@ function App() {
   const [runsStatus, setRunsStatus] = useState<"loading" | "ready" | "error">("loading");
   const [runsError, setRunsError] = useState("");
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
+  const [adminUsersSummary, setAdminUsersSummary] = useState<AdminUsersSummary>(emptyAdminUsersSummary);
   const [adminUsersParams, setAdminUsersParams] = useState(adminUsersInitialParams);
   const [adminUsersPagination, setAdminUsersPagination] = useState<PaginationMeta>({
     ...emptyPagination,
@@ -164,6 +173,7 @@ function App() {
   const activePreferences = currentUser?.preferences ?? defaultUserPreferences;
   const currentUserId = currentUser?.id;
   const currentUserRole = currentUser?.role;
+  const currentUserIsAdmin = currentUser ? isAdminRole(currentUser.role) : false;
 
   useEffect(() => {
     const root = document.documentElement;
@@ -332,7 +342,7 @@ function App() {
   }
 
   async function refreshAdminUsers() {
-    if (!authToken || currentUserRole !== "admin") {
+    if (!authToken || !currentUserIsAdmin) {
       return;
     }
 
@@ -343,16 +353,18 @@ function App() {
       const page = await loadUsersPage(authToken, adminUsersParams);
       setAdminUsers(page.items);
       setAdminUsersPagination(page.pagination);
+      setAdminUsersSummary(page.summary);
       setAdminUsersStatus("ready");
     } catch (error) {
       setAdminUsers([]);
+      setAdminUsersSummary(emptyAdminUsersSummary);
       setAdminUsersStatus("error");
       setAdminUsersError(error instanceof Error ? error.message : "Не удалось получить список пользователей.");
     }
   }
 
   async function refreshAdminQuestionnaires() {
-    if (!authToken || currentUserRole !== "admin") {
+    if (!authToken || !currentUserIsAdmin) {
       return;
     }
 
@@ -423,7 +435,7 @@ function App() {
 
     setAdminUsersParams(nextParams);
 
-    if (!authToken || currentUserRole !== "admin") {
+    if (!authToken || !currentUserIsAdmin) {
       return;
     }
 
@@ -434,10 +446,12 @@ function App() {
       .then((page) => {
         setAdminUsers(page.items);
         setAdminUsersPagination(page.pagination);
+        setAdminUsersSummary(page.summary);
         setAdminUsersStatus("ready");
       })
       .catch((error) => {
         setAdminUsers([]);
+        setAdminUsersSummary(emptyAdminUsersSummary);
         setAdminUsersStatus("error");
         setAdminUsersError(error instanceof Error ? error.message : "РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№.");
       });
@@ -452,7 +466,7 @@ function App() {
 
     setAdminQuestionnairesParams(nextParams);
 
-    if (!authToken || currentUserRole !== "admin") {
+    if (!authToken || !currentUserIsAdmin) {
       return;
     }
 
@@ -867,7 +881,7 @@ function App() {
             active: isRunsPageOpen,
             onClick: handleOpenRunsPage,
           },
-          ...(currentUser.role === "admin"
+          ...(isAdminRole(currentUser.role)
             ? [
                 {
                   label: "Сценарии в базе",
@@ -996,6 +1010,7 @@ function App() {
       <>
         <AdminUsersPage
           users={adminUsers}
+          summary={adminUsersSummary}
           pagination={adminUsersPagination}
           params={adminUsersParams}
           status={adminUsersStatus}
@@ -1092,7 +1107,7 @@ function App() {
           onPageChange={handleCatalogPageChange}
           onPageSizeChange={handleCatalogPageSizeChange}
           onOpenManualUpload={handleOpenManualUpload}
-          onOpenAdminQuestionnaires={currentUser.role === "admin" ? handleOpenAdminQuestionnairesPage : undefined}
+          onOpenAdminQuestionnaires={isAdminRole(currentUser.role) ? handleOpenAdminQuestionnairesPage : undefined}
           {...sharedHeaderProps}
         />
       )}

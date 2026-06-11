@@ -9,6 +9,7 @@ import type {
   UserRole,
 } from "../types.js";
 import type { Questionnaire } from "./questionnaireContract.js";
+import { canAssignUserRole, canManageUserRole, isAdminRole } from "./access.js";
 import { createId, hashPassword, toPublicUser, verifyPassword } from "./crypto.js";
 import { logWarn } from "./logger.js";
 
@@ -98,11 +99,17 @@ export async function listUsers(): Promise<PublicUser[]> {
   return result.rows.map(mapUser).map(toPublicUser);
 }
 
-export async function listUsersPage(input: PaginationInput = {}): Promise<PaginatedResult<PublicUser>> {
+export async function listUsersPage(input: PaginationInput = {}): Promise<PaginatedResult<PublicUser, {
+  totalUsers: number;
+  operatorUsers: number;
+  noAccessUsers: number;
+}>> {
   await ensureInitialAdmin();
   const { page: requestedPage, pageSize, search } = sanitizePagination(input);
   const params: unknown[] = [];
   const conditions: string[] = [];
+  const summaryParams: unknown[] = [];
+  const summaryConditions: string[] = [];
 
   if (input.role && input.role !== "all") {
     params.push(input.role);
@@ -110,9 +117,31 @@ export async function listUsersPage(input: PaginationInput = {}): Promise<Pagina
   }
 
   addSearchCondition(conditions, params, ["login", "full_name", "email", "phone", "position"], search);
+  addSearchCondition(
+    summaryConditions,
+    summaryParams,
+    ["login", "full_name", "email", "phone", "position"],
+    search,
+  );
 
   const whereSql = conditions.length ? `where ${conditions.join(" and ")}` : "";
+  const summaryWhereSql = summaryConditions.length ? `where ${summaryConditions.join(" and ")}` : "";
   const totalItems = await countRows(`select count(*)::int as count from users ${whereSql}`, params);
+  const summaryResult = await pool.query<{
+    total_users: number;
+    operator_users: number;
+    no_access_users: number;
+  }>(
+    `
+      select
+        count(*)::int as total_users,
+        count(*) filter (where role = 'operator')::int as operator_users,
+        count(*) filter (where role = 'user')::int as no_access_users
+      from users
+      ${summaryWhereSql}
+    `,
+    summaryParams,
+  );
   const pagination = buildPagination(totalItems, requestedPage, pageSize);
   const pageParams = [...params, pagination.pageSize, (pagination.page - 1) * pagination.pageSize];
   const result = await pool.query<UserRow>(
@@ -123,6 +152,11 @@ export async function listUsersPage(input: PaginationInput = {}): Promise<Pagina
   return {
     items: result.rows.map(mapUser).map(toPublicUser),
     pagination,
+    summary: {
+      totalUsers: summaryResult.rows[0]?.total_users ?? 0,
+      operatorUsers: summaryResult.rows[0]?.operator_users ?? 0,
+      noAccessUsers: summaryResult.rows[0]?.no_access_users ?? 0,
+    },
   };
 }
 
@@ -180,11 +214,40 @@ export async function createUser(input: {
 }
 
 export async function updateUserAdmin(input: {
+  actorId: string;
+  actorRole: UserRole;
   userId: string;
   role: UserRole;
   active?: boolean;
 }): Promise<PublicUser | null> {
   return inTransaction(async (client) => {
+    const currentResult = await client.query<UserRow>(userSelectSql("where id = $1"), [input.userId]);
+    const currentUser = currentResult.rows[0] ? mapUser(currentResult.rows[0]) : null;
+
+    if (!currentUser) {
+      return null;
+    }
+
+    if (currentUser.id === input.actorId) {
+      throw new StorageConflictError("Нельзя менять роль или закрывать вход своей учётной записи.");
+    }
+
+    if (!canManageUserRole(input.actorRole, currentUser.role)) {
+      throw new StorageForbiddenError(
+        currentUser.role === "superadmin"
+          ? "Учётная запись главного администратора защищена от изменения."
+          : "Только главный администратор может управлять другими администраторами.",
+      );
+    }
+
+    if (input.role === "superadmin") {
+      throw new StorageForbiddenError("Назначить второго главного администратора нельзя.");
+    }
+
+    if (!canAssignUserRole(input.actorRole, input.role)) {
+      throw new StorageForbiddenError("Только главный администратор может назначать роль администратора.");
+    }
+
     const result = await client.query<UserRow>(
       `
         update users
@@ -200,7 +263,7 @@ export async function updateUserAdmin(input: {
     const user = result.rows[0] ? mapUser(result.rows[0]) : null;
 
     if (user) {
-      await addAuditLog(client, null, "user.admin_updated", "user", user.id, {
+      await addAuditLog(client, input.actorId, "user.admin_updated", "user", user.id, {
         role: user.role,
         active: user.active,
       });
@@ -323,7 +386,7 @@ export async function importQuestionnaireVersions(input: {
 
       if (questionnaireExists.rowCount) {
         await client.query(
-          "update questionnaires set title = $2, archived = $3, updated_at = now() where id = $1",
+          "update questionnaires set title = $2, archived = $3, deleted_at = null, updated_at = now() where id = $1",
           [questionnaire.id, questionnaire.title, !questionnaire.active],
         );
       } else {
@@ -384,11 +447,30 @@ export async function publishQuestionnaireVersion(input: {
   return inTransaction(async (client) => {
     const versionResult = input.versionId
       ? await client.query<QuestionnaireVersionRow>(
-        versionSelectSql("where id = $1 and questionnaire_id = $2"),
+        versionSelectSql(`
+          where id = $1
+            and questionnaire_id = $2
+            and exists (
+              select 1
+              from questionnaires
+              where questionnaires.id = questionnaire_versions.questionnaire_id
+                and questionnaires.deleted_at is null
+            )
+        `),
         [input.versionId, input.questionnaireId],
       )
       : await client.query<QuestionnaireVersionRow>(
-        versionSelectSql("where questionnaire_id = $1 order by version desc limit 1"),
+        versionSelectSql(`
+          where questionnaire_id = $1
+            and exists (
+              select 1
+              from questionnaires
+              where questionnaires.id = questionnaire_versions.questionnaire_id
+                and questionnaires.deleted_at is null
+            )
+          order by version desc
+          limit 1
+        `),
         [input.questionnaireId],
       );
     const version = versionResult.rows[0] ? mapQuestionnaireVersion(versionResult.rows[0]) : null;
@@ -445,7 +527,16 @@ export async function deleteQuestionnaireVersion(input: {
 }): Promise<boolean> {
   return inTransaction(async (client) => {
     const versionResult = await client.query<QuestionnaireVersionRow>(
-      versionSelectSql("where id = $1 and questionnaire_id = $2"),
+      versionSelectSql(`
+        where id = $1
+          and questionnaire_id = $2
+          and exists (
+            select 1
+            from questionnaires
+            where questionnaires.id = questionnaire_versions.questionnaire_id
+              and questionnaires.deleted_at is null
+          )
+      `),
       [input.versionId, input.questionnaireId],
     );
     const version = versionResult.rows[0] ? mapQuestionnaireVersion(versionResult.rows[0]) : null;
@@ -471,9 +562,24 @@ export async function deleteQuestionnaireVersion(input: {
     );
 
     if ((versionCount.rows[0]?.count ?? 0) <= 1) {
-      throw new StorageConflictError(
-        "Это единственная версия сценария. Для полного удаления используйте кнопку «Удалить сценарий».",
+      await client.query(
+        `
+          update questionnaires
+          set active_version_id = null,
+              archived = true,
+              updated_at = now()
+          where id = $1
+        `,
+        [input.questionnaireId],
       );
+      await client.query("delete from questionnaire_versions where id = $1", [input.versionId]);
+      await client.query("delete from questionnaires where id = $1", [input.questionnaireId]);
+      await addAuditLog(client, input.adminId, "questionnaire.deleted_with_last_version", "questionnaire", input.questionnaireId, {
+        versionId: input.versionId,
+        version: version.version,
+      });
+
+      return true;
     }
 
     await client.query(
@@ -502,7 +608,7 @@ export async function deleteQuestionnaire(input: {
 }): Promise<boolean> {
   return inTransaction(async (client) => {
     const questionnaireResult = await client.query<QuestionnaireRow>(
-      questionnaireSelectSql("where id = $1"),
+      questionnaireSelectSql("where id = $1 and deleted_at is null"),
       [input.questionnaireId],
     );
     const questionnaire = questionnaireResult.rows[0]
@@ -519,9 +625,27 @@ export async function deleteQuestionnaire(input: {
     );
 
     if ((runCount.rows[0]?.count ?? 0) > 0) {
-      throw new StorageConflictError(
-        "Сценарий нельзя удалить: по нему уже есть черновики или завершённые прохождения.",
+      await client.query(
+        `
+          update questionnaires
+          set active_version_id = null,
+              archived = true,
+              deleted_at = now(),
+              updated_at = now()
+          where id = $1
+        `,
+        [input.questionnaireId],
       );
+      await client.query(
+        "update questionnaire_versions set published = false where questionnaire_id = $1",
+        [input.questionnaireId],
+      );
+      await addAuditLog(client, input.adminId, "questionnaire.soft_deleted", "questionnaire", input.questionnaireId, {
+        title: questionnaire.title,
+        preservedRuns: runCount.rows[0]?.count ?? 0,
+      });
+
+      return true;
     }
 
     await client.query(
@@ -545,7 +669,7 @@ export async function listQuestionnairesForAdmin() {
   await ensureInitialAdmin();
 
   const questionnairesResult = await pool.query<QuestionnaireRow>(
-    questionnaireSelectSql("order by updated_at desc, title"),
+    questionnaireSelectSql("where deleted_at is null order by updated_at desc, title"),
   );
   const versionsResult = await pool.query<QuestionnaireVersionRow>(
     versionSelectSql("order by questionnaire_id, version desc"),
@@ -584,14 +708,14 @@ export async function listQuestionnairesForAdminPage(input: PaginationInput = {}
   await ensureInitialAdmin();
   const { page: requestedPage, pageSize, search } = sanitizePagination(input);
   const params: unknown[] = [];
-  const conditions: string[] = [];
+  const conditions: string[] = ["deleted_at is null"];
 
   addQuestionnaireSearchCondition(conditions, params, search);
 
   const whereSql = conditions.length ? `where ${conditions.join(" and ")}` : "";
   const totalItems = await countRows(`select count(*)::int as count from questionnaires ${whereSql}`, params);
   const activeItems = await countRows(
-    `select count(*)::int as count from questionnaires ${conditions.length ? `where ${conditions.join(" and ")} and archived = false` : "where archived = false"}`,
+    `select count(*)::int as count from questionnaires where ${conditions.join(" and ")} and archived = false`,
     params,
   );
   const totalVersions = await countRows(
@@ -665,7 +789,7 @@ export async function listPublishedQuestionnaires() {
       v.imported_at
     from questionnaires q
     join questionnaire_versions v on v.id = q.active_version_id
-    where q.archived = false and v.published = true
+    where q.deleted_at is null and q.archived = false and v.published = true
     order by q.title
   `);
 
@@ -682,7 +806,7 @@ export async function listPublishedQuestionnairesPage(input: PaginationInput = {
   await ensureInitialAdmin();
   const { page: requestedPage, pageSize, search } = sanitizePagination(input);
   const params: unknown[] = [];
-  const conditions = ["q.archived = false", "v.published = true"];
+  const conditions = ["q.deleted_at is null", "q.archived = false", "v.published = true"];
 
   addSearchCondition(conditions, params, ["q.id", "q.title"], search, ["cast(v.version as text)"]);
 
@@ -738,7 +862,7 @@ export async function getPublishedQuestionnaire(questionnaireId: string) {
         v.source_json
       from questionnaires q
       join questionnaire_versions v on v.id = q.active_version_id
-      where q.id = $1 and q.archived = false and v.published = true
+      where q.id = $1 and q.deleted_at is null and q.archived = false and v.published = true
     `,
     [questionnaireId],
   );
@@ -759,7 +883,7 @@ export async function getPublishedQuestionnaire(questionnaireId: string) {
 export async function createRun(questionnaireId: string, operatorId: string): Promise<QuestionnaireRun | null> {
   return inTransaction(async (client) => {
     const questionnaire = await client.query<QuestionnaireRow>(
-      questionnaireSelectSql("where id = $1 and archived = false"),
+      questionnaireSelectSql("where id = $1 and deleted_at is null and archived = false"),
       [questionnaireId],
     );
     const item = questionnaire.rows[0] ? mapQuestionnaire(questionnaire.rows[0]) : null;
@@ -821,7 +945,7 @@ export async function getRunForUser(runId: string, userId: string, role: UserRol
     return null;
   }
 
-  if (role !== "admin" && run.operatorId !== userId) {
+  if (!isAdminRole(role) && run.operatorId !== userId) {
     throw new StorageForbiddenError("Нет доступа к этому прохождению.");
   }
 
@@ -830,7 +954,7 @@ export async function getRunForUser(runId: string, userId: string, role: UserRol
 
 export async function listRunsForUser(userId: string, role: UserRole): Promise<QuestionnaireRun[]> {
   await ensureInitialAdmin();
-  const result = role === "admin"
+  const result = isAdminRole(role)
     ? await pool.query<QuestionnaireRunRow>(runSelectSql("order by started_at desc"))
     : await pool.query<QuestionnaireRunRow>(runSelectSql("where operator_id = $1 order by started_at desc"), [userId]);
 
@@ -851,7 +975,7 @@ export async function listRunsForUserPage(
   const params: unknown[] = [];
   const conditions: string[] = [];
 
-  if (role !== "admin") {
+  if (!isAdminRole(role)) {
     params.push(userId);
     conditions.push(`operator_id = $${params.length}`);
   }
@@ -909,7 +1033,7 @@ export async function deleteDraftRun(input: {
       return false;
     }
 
-    if (input.role !== "admin" && currentRun.operatorId !== input.userId) {
+    if (!isAdminRole(input.role) && currentRun.operatorId !== input.userId) {
       throw new StorageForbiddenError("Нет доступа к этому прохождению.");
     }
 
@@ -963,7 +1087,7 @@ async function updateRun(input: {
       return null;
     }
 
-    if (input.role !== "admin" && currentRun.operatorId !== input.userId) {
+    if (!isAdminRole(input.role) && currentRun.operatorId !== input.userId) {
       throw new StorageForbiddenError("Нет доступа к этому прохождению.");
     }
 
@@ -1049,25 +1173,41 @@ async function ensureInitialAdmin(existingClient?: PoolClient): Promise<void> {
   const client = existingClient ?? await pool.connect();
 
   try {
-    const usersCount = await client.query<{ count: string }>("select count(*) from users");
+    const adminLogin = process.env.ADMIN_LOGIN?.trim() || "admin";
+    const existingAdmin = await client.query<UserRow>(
+      userSelectSql("where lower(login) = lower($1)"),
+      [adminLogin],
+    );
 
-    if (Number(usersCount.rows[0]?.count ?? 0) > 0) {
+    if (existingAdmin.rows[0]) {
+      if (existingAdmin.rows[0].role !== "superadmin" || !existingAdmin.rows[0].active) {
+        await client.query(
+          `
+            update users
+            set role = 'superadmin',
+                active = true,
+                updated_at = now()
+            where id = $1
+          `,
+          [existingAdmin.rows[0].id],
+        );
+      }
+
       return;
     }
 
     const now = new Date().toISOString();
-    const adminLogin = process.env.ADMIN_LOGIN?.trim() || "admin";
     const adminPassword = process.env.ADMIN_PASSWORD?.trim() || "KService-Admin-2026!";
     const { hash, salt } = hashPassword(adminPassword);
 
     await insertUser(client, {
       id: createId("usr"),
       login: adminLogin,
-      fullName: "Администратор",
+      fullName: "Главный администратор",
       email: "",
       phone: "",
-      position: "Администратор",
-      role: "admin",
+      position: "Главный администратор",
+      role: "superadmin",
       active: true,
       preferences: defaultPreferences,
       passwordHash: hash,
@@ -1290,6 +1430,7 @@ const questionnaireColumns = `
   title,
   active_version_id,
   archived,
+  deleted_at,
   created_at,
   updated_at
 `;
@@ -1451,6 +1592,7 @@ interface QuestionnaireRow {
   title: string;
   active_version_id: string | null;
   archived: boolean;
+  deleted_at: Date | string | null;
   created_at: Date | string;
   updated_at: Date | string;
 }

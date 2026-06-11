@@ -292,6 +292,10 @@ function getSettingsStatusText(status: SettingsStatus): string {
 }
 
 function getRoleLabel(role: CurrentUser["role"] | undefined): string {
+  if (role === "superadmin") {
+    return "Главный администратор";
+  }
+
   if (role === "admin") {
     return "Администратор";
   }

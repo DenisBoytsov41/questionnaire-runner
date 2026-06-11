@@ -10,6 +10,7 @@ enum UserRole {
   user
   operator
   admin
+  superadmin
 
   @@map("user_role")
 }
@@ -49,6 +50,7 @@ model Questionnaire {
   title           String
   activeVersionId String?                @map("active_version_id")
   archived        Boolean                @default(false)
+  deletedAt       DateTime?              @map("deleted_at") @db.Timestamptz(6)
   createdAt       DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime               @default(now()) @map("updated_at") @db.Timestamptz(6)
   activeVersion   QuestionnaireVersion?  @relation("ActiveQuestionnaireVersion", fields: [activeVersionId], references: [id])
@@ -56,6 +58,7 @@ model Questionnaire {
   runs            QuestionnaireRun[]
 
   @@index([archived], map: "questionnaires_archived_idx")
+  @@index([deletedAt, updatedAt(sort: Desc)], map: "questionnaires_deleted_updated_idx")
   @@index([updatedAt(sort: Desc), title], map: "questionnaires_updated_title_idx")
   @@index([archived, title], map: "questionnaires_archived_title_idx")
   @@map("questionnaires")

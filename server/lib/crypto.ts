@@ -91,5 +91,5 @@ function toBase64Url(value: string): string {
 }
 
 function isUserRole(value: unknown): value is UserRole {
-  return value === "user" || value === "operator" || value === "admin";
+  return value === "user" || value === "operator" || value === "admin" || value === "superadmin";
 }

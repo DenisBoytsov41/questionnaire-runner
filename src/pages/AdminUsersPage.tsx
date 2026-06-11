@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import type {
   AdminUser,
+  AdminUsersSummary,
   CreateAdminUserInput,
   CurrentUser,
   ListPageParams,
@@ -9,11 +10,13 @@ import type {
   UserRole,
 } from "../shared/api/backendApi";
 import { BrandHeader, type HeaderNavigationItem, type SettingsStatus } from "../shared/ui/BrandHeader";
+import { canManageUser } from "../shared/lib/access";
 import { Pagination } from "../shared/ui/Pagination";
 import { RoundedSelect } from "../shared/ui/RoundedSelect";
 
 interface AdminUsersPageProps {
   users: AdminUser[];
+  summary: AdminUsersSummary;
   pagination: PaginationMeta;
   params: Required<Pick<ListPageParams, "page" | "pageSize" | "search" | "role">>;
   status: "loading" | "ready" | "error";
@@ -45,12 +48,18 @@ const roleOptions: Array<{ value: UserRole; label: string; description: string }
   {
     value: "admin",
     label: "Администратор",
-    description: "Управляет пользователями и сценариями.",
+    description: "Управляет операторами и сценариями, но не может изменять других администраторов.",
+  },
+  {
+    value: "superadmin",
+    label: "Главный администратор",
+    description: "Управляет администраторами и всей системой. Системная защищённая учётная запись.",
   },
 ];
 
 export function AdminUsersPage({
   users,
+  summary,
   pagination,
   params,
   status,
@@ -82,6 +91,9 @@ export function AdminUsersPage({
   });
   const [localError, setLocalError] = useState("");
   const isLoading = status === "loading";
+  const assignableRoleOptions = user.role === "superadmin"
+    ? roleOptions.filter((option) => option.value !== "superadmin")
+    : roleOptions.filter((option) => option.value === "user" || option.value === "operator");
 
   async function updateAccess(targetUser: AdminUser, input: { role?: UserRole; active?: boolean }) {
     setSavingUserId(targetUser.id);
@@ -162,15 +174,15 @@ export function AdminUsersPage({
             <p className="page-kicker">Администрирование</p>
             <h1>Пользователи и доступ</h1>
             <p>
-              Здесь администратор назначает роль сотрудника и может временно закрыть вход.
-              Нового оператора можно создать сразу с временным паролем и открытым доступом.
+              Администраторы управляют операторами и сценариями. Главный администратор дополнительно
+              назначает администраторов и управляет их доступом.
             </p>
           </div>
 
           <div className="admin-users-metrics">
-            <AdminMetric label="Всего" value={pagination.totalItems} />
-            <AdminMetric label="Операторы" value={users.filter((item) => item.role === "operator").length} />
-            <AdminMetric label="Без доступа" value={users.filter((item) => item.role === "user").length} />
+            <AdminMetric label="Всего" value={summary.totalUsers} />
+            <AdminMetric label="Операторы" value={summary.operatorUsers} />
+            <AdminMetric label="Без доступа" value={summary.noAccessUsers} />
           </div>
         </div>
 
@@ -296,7 +308,7 @@ export function AdminUsersPage({
                   <span>Роль</span>
                   <RoundedSelect
                     value={createForm.role}
-                    options={roleOptions}
+                    options={assignableRoleOptions}
                     ariaLabel="Роль нового сотрудника"
                     onChange={(role) => setCreateForm((current) => ({ ...current, role }))}
                   />
@@ -353,6 +365,8 @@ export function AdminUsersPage({
               {users.map((employee) => {
               const isSelf = employee.id === user.id;
               const isSaving = savingUserId === employee.id;
+              const canManageEmployee = !isSelf && canManageUser(user.role, employee.role);
+              const accessRestriction = getAccessRestriction(user.role, employee.role, isSelf);
 
               return (
                 <article key={employee.id} className={`admin-user-card ${employee.active ? "" : "blocked"}`}>
@@ -382,19 +396,20 @@ export function AdminUsersPage({
                       <span>Роль</span>
                       <RoundedSelect
                         value={employee.role}
-                        disabled={isSaving || isSelf}
-                        options={roleOptions}
+                        disabled={isSaving || !canManageEmployee}
+                        options={canManageEmployee ? assignableRoleOptions : roleOptions}
                         ariaLabel={`Роль сотрудника ${employee.fullName || employee.login}`}
                         onChange={(role) => updateAccess(employee, { role })}
-                        title={isSelf ? "Свою роль нельзя менять из этой страницы." : undefined}
+                        title={accessRestriction}
                       />
                     </label>
 
                     <button
                       type="button"
                       className="secondary-button"
-                      disabled={isSaving || isSelf}
+                      disabled={isSaving || !canManageEmployee}
                       onClick={() => updateAccess(employee, { active: !employee.active })}
+                      title={accessRestriction}
                     >
                       {employee.active ? "Закрыть вход" : "Открыть вход"}
                     </button>
@@ -405,6 +420,7 @@ export function AdminUsersPage({
                     <span>{employee.email || "Почта не указана"}</span>
                     <span>{employee.phone || "Телефон не указан"}</span>
                     {isSelf && <span>Это ваша учётная запись</span>}
+                    {!isSelf && accessRestriction && <span>{accessRestriction}</span>}
                     {isSaving && <span>Сохраняем изменения...</span>}
                   </div>
                 </article>
@@ -451,4 +467,24 @@ function getInitials(user: AdminUser): string {
 
 function getRoleDescription(role: UserRole): string {
   return roleOptions.find((option) => option.value === role)?.description ?? "";
+}
+
+function getAccessRestriction(
+  actorRole: UserRole,
+  targetRole: UserRole,
+  isSelf: boolean,
+): string | undefined {
+  if (isSelf) {
+    return "Свою роль и доступ нельзя менять на этой странице.";
+  }
+
+  if (targetRole === "superadmin") {
+    return "Учётная запись главного администратора защищена.";
+  }
+
+  if (actorRole !== "superadmin" && targetRole === "admin") {
+    return "Управлять администраторами может только главный администратор.";
+  }
+
+  return undefined;
 }
